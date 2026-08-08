@@ -7,6 +7,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "audit:dependencies": "npm audit --audit-level=high",
     "check:repo": "node scripts/verify-repository.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/verify-build.mjs",

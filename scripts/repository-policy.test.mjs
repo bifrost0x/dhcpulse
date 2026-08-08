@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { findForbiddenPaths } from './repository-policy.mjs';
+import {
+  findForbiddenPaths,
+  findUnpinnedActionReferences,
+  findUnpinnedDockerImages,
+} from './repository-policy.mjs';
 
 describe('repository policy', () => {
   it('rejects internal planning and local tool artifacts', () => {
@@ -61,5 +65,34 @@ describe('repository policy', () => {
         'SECURITY.md',
       ]),
     ).toEqual([]);
+  });
+
+  it('rejects mutable GitHub Action references', () => {
+    expect(
+      findUnpinnedActionReferences([
+        {
+          path: '.github/workflows/ci.yml',
+          content: `steps:
+  - uses: actions/checkout@v5
+  - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+  - name: Deploy
+    uses: actions/deploy-pages@v4
+  - uses: ./local-action
+`,
+        },
+      ]),
+    ).toEqual([
+      '.github/workflows/ci.yml:2 actions/checkout@v5',
+      '.github/workflows/ci.yml:5 actions/deploy-pages@v4',
+    ]);
+  });
+
+  it('rejects Docker base images without immutable digests', () => {
+    expect(
+      findUnpinnedDockerImages(`FROM --platform=linux/amd64 node:24-alpine
+FROM nginx:1.31@sha256:${'a'.repeat(64)}
+FROM scratch
+`),
+    ).toEqual(['line 1 node:24-alpine']);
   });
 });

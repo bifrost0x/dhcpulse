@@ -59,3 +59,47 @@ function isForbiddenPath(filePath) {
 export function findForbiddenPaths(filePaths) {
   return filePaths.filter(isForbiddenPath);
 }
+
+export function findUnpinnedActionReferences(workflows) {
+  const findings = [];
+
+  for (const workflow of workflows) {
+    const lines = workflow.content.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      const match = line.match(/^\s*(?:-\s+)?uses:\s+([^\s#]+)(?:\s+#.*)?$/);
+      if (!match) {
+        continue;
+      }
+
+      const reference = match[1].replace(/^['"]|['"]$/g, '');
+      if (reference.startsWith('./') || /@[0-9a-f]{40}$/i.test(reference)) {
+        continue;
+      }
+
+      findings.push(`${workflow.path}:${index + 1} ${reference}`);
+    }
+  }
+
+  return findings;
+}
+
+export function findUnpinnedDockerImages(dockerfile) {
+  const findings = [];
+  const lines = dockerfile.split(/\r?\n/);
+
+  for (const [index, line] of lines.entries()) {
+    const match = line.match(/^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)/i);
+    if (!match) {
+      continue;
+    }
+
+    const image = match[1];
+    if (image.toLowerCase() === 'scratch' || /@sha256:[0-9a-f]{64}$/i.test(image)) {
+      continue;
+    }
+
+    findings.push(`line ${index + 1} ${image}`);
+  }
+
+  return findings;
+}

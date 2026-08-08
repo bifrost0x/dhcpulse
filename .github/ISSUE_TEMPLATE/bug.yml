@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem in DHCPulse
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include real customer configurations, lease data, addresses, client identifiers, credentials, or secrets. Use synthetic examples only. Security vulnerabilities belong in the private process linked from the issue chooser.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest synthetic scenario that reproduces the problem.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Browser name and version, if relevant.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add screenshots or references only after removing operational identifiers.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I used synthetic data and removed sensitive or identifying information.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true

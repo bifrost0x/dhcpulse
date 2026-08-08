@@ -2,6 +2,8 @@
 
 Thanks for improving DHCPulse. The most useful contributions are small, reproducible, and grounded in documented DHCP behavior or a real operational scenario.
 
+Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Before opening a pull request
 
 1. Open an issue for a new planning rule or material workflow change.
@@ -20,6 +22,8 @@ npm run dev
 Before submitting:
 
 ```bash
+npm run check:repo
+npm run audit:dependencies
 npm run lint
 npm run typecheck
 npm test

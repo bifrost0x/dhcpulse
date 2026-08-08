@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a focused DHCP planning improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the operational decision the feature should improve. Do not include real customer configurations, addresses, identifiers, credentials, or secrets.
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Operational use case
+      description: Which real-world DHCP task or decision is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should the operator understand or be able to do?
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Link authoritative standards or vendor documentation where applicable.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: This request preserves the browser-only privacy boundary.
+          required: true
+        - label: I used synthetic examples and removed sensitive information.
+          required: true

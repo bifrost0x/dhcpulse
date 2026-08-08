@@ -63,6 +63,8 @@ Open the local URL printed by Vite.
 ## Verify
 
 ```bash
+npm run check:repo
+npm run audit:dependencies
 npm run lint
 npm run typecheck
 npm test
@@ -81,7 +83,7 @@ npm run build
 
 Publish the contents of `dist/`. Relative asset paths allow deployment at a domain root or repository subpath.
 
-The included GitHub Pages workflow builds and deploys on `main` or can be started manually after Pages is configured to use GitHub Actions.
+The included GitHub Pages workflow can be started manually after Pages is configured to use GitHub Actions.
 
 ### Docker
 
@@ -103,6 +105,8 @@ Set `DHCPULSE_PORT` to publish a different host port.
 ## Contributing
 
 Bug reports, validated DHCP edge cases, translations, accessibility improvements, and focused risk rules are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change. Security concerns belong in the private process described in [SECURITY.md](SECURITY.md).
+
+General usage questions belong in GitHub Discussions. See [SUPPORT.md](SUPPORT.md) for the support boundaries and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
 
 ## License
 
