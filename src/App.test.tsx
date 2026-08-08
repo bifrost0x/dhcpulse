@@ -118,6 +118,48 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toBeVisible();
   });
 
+  it('returns keyboard focus to the catalog heading from both Back links', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/scope');
+
+    const toolBack = screen.getByRole('link', { name: 'Back to all tools' });
+    toolBack.focus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toHaveFocus();
+
+    window.location.hash = '#/tool/unknown';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    const notFoundBack = screen.getByRole('link', { name: 'Back to all tools' });
+    notFoundBack.focus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toHaveFocus();
+  });
+
+  it('focuses the catalog heading only when a hash route returns from a tool', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    const initialHeading = screen.getByRole('heading', { name: 'DHCPulse Workbench' });
+
+    expect(initialHeading).toHaveAttribute('tabindex', '-1');
+    expect(initialHeading).not.toHaveFocus();
+
+    const germanButton = screen.getByRole('button', { name: 'Deutsch' });
+    germanButton.focus();
+    await user.keyboard('{Enter}');
+    expect(germanButton).toHaveFocus();
+    expect(initialHeading).not.toHaveFocus();
+
+    window.location.hash = '#/tool/scope';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    expect(screen.getByRole('heading', { name: 'Bereich und Kapazität' })).toHaveFocus();
+
+    window.location.hash = '#/';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toHaveFocus();
+  });
+
   it('moves category selection and focus with wrapping keyboard controls', () => {
     renderAt();
     expect(screen.getByRole('toolbar', { name: 'Tool categories' })).toBeVisible();

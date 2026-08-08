@@ -47,9 +47,9 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
   const [route, setRoute] = useState<Route>(() => routeFromHash(window.location.hash));
   const [leaseResetVersion, setLeaseResetVersion] = useState(0);
   const routeHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousRouteKindRef = useRef<Route['kind'] | null>(null);
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
   const routeKey = route.kind === 'tool' ? `tool:${route.id}` : route.kind;
-  const routeHasFocusTarget = route.kind !== 'catalog';
 
   useEffect(() => {
     const updateRoute = () => setRoute(routeFromHash(window.location.hash));
@@ -58,8 +58,13 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
   }, []);
 
   useEffect(() => {
-    if (routeHasFocusTarget) routeHeadingRef.current?.focus();
-  }, [routeHasFocusTarget, routeKey]);
+    const previousRouteKind = previousRouteKindRef.current;
+    const returningToCatalog = route.kind === 'catalog'
+      && previousRouteKind !== null
+      && previousRouteKind !== 'catalog';
+    if (route.kind !== 'catalog' || returningToCatalog) routeHeadingRef.current?.focus();
+    previousRouteKindRef.current = route.kind;
+  }, [route.kind, routeKey]);
 
   function showCatalog() {
     setRoute({ kind: 'catalog' });
@@ -75,7 +80,7 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
       <>
         <section className="catalog-hero">
           <p className="eyebrow"><span className="pulse-dot" />{t('shell.eyebrow')}</p>
-          <h1>{t('shell.title')}</h1>
+          <h1 ref={routeHeadingRef} tabIndex={-1}>{t('shell.title')}</h1>
           <p>{t('shell.description')}</p>
         </section>
         <ToolCatalog locale={locale} onToolSelect={(id) => setRoute({ kind: 'tool', id })} />
