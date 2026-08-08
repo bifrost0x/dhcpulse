@@ -94,11 +94,15 @@ function isHttpUrl(value: string | undefined): boolean {
 function microsoftExample(input: PxeAnalysisInput, codes: number[]): string {
   const server = input.serverName ?? input.serverAddress ?? '<review-server>';
   const bootFile = input.bootFile ?? '<review-boot-file>';
+  const vendorClass = parseVendorClass(input.vendorClass);
   const architectureClasses = codes.map((code) => {
     const paddedCode = String(code).padStart(5, '0');
     return {
       name: `<REVIEW-PXE-ARCH-${paddedCode}>`,
-      data: `${input.vendorClass ?? 'PXEClient'}:Arch:${paddedCode}`,
+      data:
+        vendorClass.observed?.architectureCode === code
+          ? vendorClass.observed.value
+          : `${vendorClass.prefix}:Arch:${paddedCode}:UNDI:003016`,
     };
   });
   const userClassCondition = input.userClass ? ' -UserClass $UserClassConditions' : '';
@@ -108,6 +112,8 @@ function microsoftExample(input: PxeAnalysisInput, codes: number[]): string {
     "$PolicyName = '<REVIEW-POLICY-NAME>'",
     `$BootServer = '${escapePowerShell(server)}'`,
     `$BootFile = '${escapePowerShell(bootFile)}'`,
+    '# Capture Option 60 in this environment and replace every example below with the exact complete VCI value observed.',
+    '# UNDI:003016 is an example suffix only. Windows DHCP vendor classes do not perform prefix matching.',
     ...architectureClasses.map(
       ({ name, data }) =>
         `Add-DhcpServerv4Class -Name '${escapePowerShell(name)}' -Type Vendor -Data '${escapePowerShell(data)}'`,
@@ -122,7 +128,7 @@ function microsoftExample(input: PxeAnalysisInput, codes: number[]): string {
 
 function keaExample(input: PxeAnalysisInput, codes: number[]): string {
   const architectureTest = codes.map((code) => `option[93].hex == 0x${code.toString(16).padStart(4, '0')}`).join(' or ');
-  const vendorPrefix = input.vendorClass ?? 'PXEClient';
+  const vendorPrefix = parseVendorClass(input.vendorClass).prefix;
   const vendorTest = ` and substring(option[60].text, 0, ${vendorPrefix.length}) == '${escapeKeaExpression(vendorPrefix)}'`;
   const userClassTest = input.userClass ? ` and option[77].text == '${escapeKeaExpression(input.userClass)}'` : '';
   return JSON.stringify(
@@ -159,4 +165,17 @@ function powerShellArray(values: string[]): string {
 
 function escapeKeaExpression(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
+}
+
+function parseVendorClass(value: string | undefined): {
+  prefix: string;
+  observed?: { architectureCode: number; value: string };
+} {
+  const candidate = value?.trim() || 'PXEClient';
+  const completeVci = /^(.*):Arch:(\d{5}):(.+)$/.exec(candidate);
+  if (!completeVci) return { prefix: candidate };
+  return {
+    prefix: completeVci[1] || 'PXEClient',
+    observed: { architectureCode: Number(completeVci[2]), value: candidate },
+  };
 }

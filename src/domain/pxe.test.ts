@@ -28,11 +28,14 @@ describe('analyzePxe', () => {
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('Add-DhcpServerv4Policy');
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('Set-DhcpServerv4OptionValue');
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
-      "Add-DhcpServerv4Class -Name '<REVIEW-PXE-ARCH-00007>' -Type Vendor -Data 'PXEClient:Arch:00007'",
+      "Add-DhcpServerv4Class -Name '<REVIEW-PXE-ARCH-00007>' -Type Vendor -Data 'PXEClient:Arch:00007:UNDI:003016'",
     );
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
-      "Add-DhcpServerv4Class -Name '<REVIEW-PXE-ARCH-00009>' -Type Vendor -Data 'PXEClient:Arch:00009'",
+      "Add-DhcpServerv4Class -Name '<REVIEW-PXE-ARCH-00009>' -Type Vendor -Data 'PXEClient:Arch:00009:UNDI:003016'",
     );
+    expect(result.policyExamples.microsoftDhcpPowerShell).toMatch(/capture Option 60/i);
+    expect(result.policyExamples.microsoftDhcpPowerShell).toMatch(/exact complete VCI/i);
+    expect(result.policyExamples.microsoftDhcpPowerShell).toMatch(/do not perform prefix matching/i);
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
       "$VendorClassConditions = @('EQ', '<REVIEW-PXE-ARCH-00007>', '<REVIEW-PXE-ARCH-00009>')",
     );
@@ -58,6 +61,30 @@ describe('analyzePxe', () => {
       { code: 67, data: 'bootx64.efi' },
     ]);
     expect(result.reviewNotice).toMatch(/environment review/i);
+  });
+
+  it('uses a supplied complete observed VCI exactly and safely while Kea retains prefix matching', () => {
+    const result = analyzePxe({
+      architecture: 'uefi-x64',
+      vendorClass: "PXEClient:Arch:00007:UNDI:003020'Lab",
+      serverName: 'pxe.example.test',
+      bootFile: 'bootx64.efi',
+    });
+
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
+      "-Data 'PXEClient:Arch:00007:UNDI:003020''Lab'",
+    );
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
+      "-Data 'PXEClient:Arch:00009:UNDI:003016'",
+    );
+    expect(result.policyExamples.microsoftDhcpPowerShell).not.toContain(
+      "PXEClient:Arch:00007:UNDI:003020''Lab:Arch:",
+    );
+
+    const kea = JSON.parse(result.policyExamples.keaJson) as {
+      'client-classes': Array<{ test: string }>;
+    };
+    expect(kea['client-classes'][0]?.test).toContain("substring(option[60].text, 0, 9) == 'PXEClient'");
   });
 
   it('warns about incompatible boot settings and missing values', () => {
