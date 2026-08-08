@@ -339,6 +339,9 @@ function parseNodes(tokens: IscToken[], start = 0, depth = 0): { nodes: IscNode[
     }
     const delimiter = tokens[index]?.value;
     if (delimiter === '{') {
+      if (header.length === 0) {
+        throw malformedIsc(`Opening brace without a block header on line ${tokens[index]?.line ?? 1}.`);
+      }
       const child = parseNodes(tokens, index + 1, depth + 1);
       nodes.push({ kind: 'block', header, children: child.nodes });
       index = child.index;

@@ -281,6 +281,7 @@ describe('importDhcpConfiguration', () => {
     ['unmatched opening brace', 'subnet 192.0.2.0 netmask 255.255.255.0 { range 192.0.2.10 192.0.2.20;'],
     ['premature EOF', 'default-lease-time 3600'],
     ['closing brace before statement terminator', 'subnet 192.0.2.0 netmask 255.255.255.0 { range 192.0.2.10 192.0.2.20 }'],
+    ['opening brace without a block header', '{ authoritative; }'],
     ['unexpected closing brace', 'subnet 192.0.2.0 netmask 255.255.255.0 { } }'],
   ] as const)('rejects malformed ISC with stable code: %s', (_case, text) => {
     expectImportErrorWithFormat(text, 'isc-dhcpd', 'MALFORMED_ISC');
