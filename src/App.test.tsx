@@ -46,6 +46,17 @@ describe('DHCPulse Workbench', () => {
     }
   });
 
+  it('keeps narrow-page overflow out of the document while category scrolling stays local', async () => {
+    const { readFileSync } = await vi.importActual<{
+      readFileSync(path: string, encoding: 'utf8'): string;
+    }>('node:fs');
+    const resetCss = readFileSync('src/styles/reset.css', 'utf8');
+    const appCss = readFileSync('src/styles/app.css', 'utf8');
+
+    expect(resetCss).not.toMatch(/body\s*\{[^}]*min-width\s*:\s*320px/i);
+    expect(appCss).toMatch(/\.category-tabs\s*\{[^}]*overflow-x\s*:\s*auto/i);
+  });
+
   it('searches translated tool content and clears an empty result', async () => {
     const user = userEvent.setup();
     renderAt();
