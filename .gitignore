@@ -24,6 +24,7 @@ plan.md
 .codex/
 .agents/
 graphify-out/
+.superpowers/
 .worktrees/
 worktrees/
 AGENTS.md

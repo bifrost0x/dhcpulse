@@ -66,3 +66,64 @@ export interface PlanResult {
   rollbackKeys: string[];
   assumptionKeys: string[];
 }
+
+export interface AddressRangeInput {
+  start: string;
+  end: string;
+}
+
+export interface ReservationInput {
+  id: string;
+  address: string;
+}
+
+export interface ScopeDefinition {
+  id: string;
+  cidr: string;
+  pool: AddressRangeInput;
+  exclusions?: AddressRangeInput[];
+  reservations?: ReservationInput[];
+  gateway?: string;
+  leases?: number;
+}
+
+export interface ScopeDesignInput {
+  scopes: ScopeDefinition[];
+  dailyGrowth?: number;
+}
+
+export interface ScopeFinding {
+  key:
+    | 'invalidCidr'
+    | 'invalidPoolRange'
+    | 'poolOutsideSubnet'
+    | 'invalidExclusionRange'
+    | 'exclusionOutsidePool'
+    | 'reservationOutsideSubnet'
+    | 'duplicateReservationAddress'
+    | 'gatewayInDynamicPool'
+    | 'overlappingScopeNetworks'
+    | 'overlappingDynamicPools'
+    | 'overCapacityCurrentLeases'
+    | 'exhaustionWithin30Days';
+  severity: Severity;
+  scopeId: string;
+}
+
+export interface ScopeCapacity {
+  scopeId: string;
+  cidr: string | null;
+  rawPoolAddresses: number;
+  excludedAddresses: number;
+  effectiveCapacity: number;
+  uniqueInPoolReservations: number;
+  currentlyUsedAddresses: number;
+  utilizationPercent: number;
+  remainingAddresses: number;
+  exhaustionDays: number | null;
+}
+
+export interface ScopeDesignResult {
+  scopes: ScopeCapacity[];
+  findings: ScopeFinding[];
+}
