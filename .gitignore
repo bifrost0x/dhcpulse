@@ -1,0 +1,39 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+.npmrc
+secrets/
+.secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Internal planning and local tooling
+docs/development/
+docs/superpowers/
+plans/
+plan.md
+.codex/
+.agents/
+graphify-out/
+.worktrees/
+worktrees/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.github/copilot-instructions.md
+
+# Local editor and operating-system state
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
