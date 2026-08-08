@@ -16,38 +16,58 @@ const severityRank: Record<Severity, number> = { blocker: 0, warning: 1, info: 2
 
 export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFailoverResult {
   const findings: WindowsFailoverFinding[] = [];
+  const timingEntries = [
+    ['mcltMinutes', input.mcltMinutes],
+    ['stateSwitchoverMinutes', input.stateSwitchoverMinutes],
+    ['clockSkewSeconds', input.clockSkewSeconds],
+    ['plannedOutageMinutes', input.plannedOutageMinutes],
+  ] as const;
   const numericEntries = [
-    ['mcltMinutes', input.mcltMinutes, isNonNegativeFinite],
-    ['stateSwitchoverMinutes', input.stateSwitchoverMinutes, isNonNegativeFinite],
-    ['clockSkewSeconds', input.clockSkewSeconds, isNonNegativeFinite],
+    ['mcltMinutes', input.mcltMinutes, isNonNegativeSafeInteger],
+    ['stateSwitchoverMinutes', input.stateSwitchoverMinutes, isNonNegativeSafeInteger],
+    ['clockSkewSeconds', input.clockSkewSeconds, isNonNegativeSafeInteger],
     ['loadBalancePercentage', input.loadBalancePercentage, isPercentage],
     ['reservePercentage', input.reservePercentage, isPercentage],
-    ['plannedOutageMinutes', input.plannedOutageMinutes, isNonNegativeFinite],
+    ['plannedOutageMinutes', input.plannedOutageMinutes, isNonNegativeSafeInteger],
   ] as const;
   const invalidNumericEvidence = numericEntries
     .filter(([, value, isValid]) => !isValid(value))
     .map(([field, value]) =>
       Number.isFinite(value) ? `${field}=${value}` : `${field}=non-finite`,
     );
+  const transitionOperandsValid =
+    isNonNegativeSafeInteger(input.stateSwitchoverMinutes) &&
+    isNonNegativeSafeInteger(input.mcltMinutes);
+  const transitionCandidate = transitionOperandsValid
+    ? input.stateSwitchoverMinutes + input.mcltMinutes
+    : 0;
+  const transitionSumSafe =
+    transitionOperandsValid && Number.isSafeInteger(transitionCandidate);
+  if (transitionOperandsValid && !transitionSumSafe) {
+    invalidNumericEvidence.push('safeTransitionMinutes=unsafe-sum');
+  }
+  const timingInputsValid =
+    timingEntries.every(([, value]) => isNonNegativeSafeInteger(value)) &&
+    transitionSumSafe;
   const numericInputsValid = invalidNumericEvidence.length === 0;
   if (!numericInputsValid) {
     findings.push(
       finding(
         'failover-invalid-numeric-input',
         'blocker',
-        'Failover timing values must be nonnegative, and percentages must be integers from 0 through 100.',
+        'Failover timing values must be nonnegative safe integers, their transition sum must remain safe, and percentages must be integers from 0 through 100.',
         invalidNumericEvidence,
       ),
     );
   }
   const safeInput: WindowsFailoverInput = {
     ...input,
-    mcltMinutes: nonNegativeOrZero(input.mcltMinutes),
-    stateSwitchoverMinutes: nonNegativeOrZero(input.stateSwitchoverMinutes),
-    clockSkewSeconds: nonNegativeOrZero(input.clockSkewSeconds),
+    mcltMinutes: nonNegativeSafeIntegerOrZero(input.mcltMinutes),
+    stateSwitchoverMinutes: nonNegativeSafeIntegerOrZero(input.stateSwitchoverMinutes),
+    clockSkewSeconds: nonNegativeSafeIntegerOrZero(input.clockSkewSeconds),
     loadBalancePercentage: percentageOrZero(input.loadBalancePercentage),
     reservePercentage: percentageOrZero(input.reservePercentage),
-    plannedOutageMinutes: nonNegativeOrZero(input.plannedOutageMinutes),
+    plannedOutageMinutes: nonNegativeSafeIntegerOrZero(input.plannedOutageMinutes),
   };
 
   if (!input.partnerReachable) {
@@ -80,7 +100,7 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
       ),
     );
   }
-  if (isNonNegativeFinite(input.clockSkewSeconds) && input.clockSkewSeconds > 60) {
+  if (isNonNegativeSafeInteger(input.clockSkewSeconds) && input.clockSkewSeconds > 60) {
     findings.push(
       finding(
         'failover-clock-skew-over-60-seconds',
@@ -121,7 +141,7 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
       ),
     );
   }
-  if (isNonNegativeFinite(input.mcltMinutes) && input.mcltMinutes === 0) {
+  if (isNonNegativeSafeInteger(input.mcltMinutes) && input.mcltMinutes === 0) {
     findings.push(
       finding(
         'failover-mclt-not-positive',
@@ -132,8 +152,8 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
     );
   }
   if (
-    isNonNegativeFinite(input.stateSwitchoverMinutes) &&
-    isNonNegativeFinite(input.mcltMinutes) &&
+    isNonNegativeSafeInteger(input.stateSwitchoverMinutes) &&
+    isNonNegativeSafeInteger(input.mcltMinutes) &&
     input.stateSwitchoverMinutes < input.mcltMinutes
   ) {
     findings.push(
@@ -159,12 +179,9 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
     );
   }
 
-  const safeTransitionMinutes =
-    Math.max(0, safeInput.stateSwitchoverMinutes) + Math.max(0, safeInput.mcltMinutes);
+  const safeTransitionMinutes = transitionSumSafe ? transitionCandidate : 0;
   if (
-    isNonNegativeFinite(input.plannedOutageMinutes) &&
-    isNonNegativeFinite(input.stateSwitchoverMinutes) &&
-    isNonNegativeFinite(input.mcltMinutes) &&
+    timingInputsValid &&
     input.plannedOutageMinutes > safeTransitionMinutes
   ) {
     findings.push(
@@ -196,25 +213,32 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
 
   return {
     partnerRoles: partnerRoles(safeInput),
-    timeline: [
-      { state: 'normal', afterMinutes: 0, rationale: 'Both partners serve their configured roles.' },
-      {
-        state: 'communication-interrupted',
-        afterMinutes: 0,
-        rationale: 'A lost partner path starts the communication-interrupted state.',
-      },
-      {
-        state: 'partner-down',
-        afterMinutes: Math.max(0, safeInput.stateSwitchoverMinutes),
-        rationale: 'Automatic transition is modeled after the configured state-switchover interval.',
-      },
-      {
-        state: 'mclt-full-pool-eligible',
-        afterMinutes: safeTransitionMinutes,
-        rationale:
-          'If the partner remains unavailable, this conditional milestone marks state switchover plus MCLT, when full-pool ownership may become eligible; it does not imply recovery.',
-      },
-    ],
+    timeline: timingInputsValid
+      ? [
+          {
+            state: 'normal',
+            afterMinutes: 0,
+            rationale: 'Both partners serve their configured roles.',
+          },
+          {
+            state: 'communication-interrupted',
+            afterMinutes: 0,
+            rationale: 'A lost partner path starts the communication-interrupted state.',
+          },
+          {
+            state: 'partner-down',
+            afterMinutes: safeInput.stateSwitchoverMinutes,
+            rationale:
+              'Automatic transition is modeled after the configured state-switchover interval.',
+          },
+          {
+            state: 'mclt-full-pool-eligible',
+            afterMinutes: safeTransitionMinutes,
+            rationale:
+              'If the partner remains unavailable, this conditional milestone marks state switchover plus MCLT, when full-pool ownership may become eligible; it does not imply recovery.',
+          },
+        ]
+      : [],
     readiness: findings.some(({ severity }) => severity === 'blocker')
       ? 'no-go'
       : findings.some(({ severity }) => severity === 'warning')
@@ -282,16 +306,16 @@ function item(key: string, passed: boolean, rationale: string): ValidationCheckl
   return { key, passed, rationale };
 }
 
-function isNonNegativeFinite(value: number): boolean {
-  return Number.isFinite(value) && value >= 0;
+function isNonNegativeSafeInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0;
 }
 
 function isPercentage(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= 100;
 }
 
-function nonNegativeOrZero(value: number): number {
-  return isNonNegativeFinite(value) ? value : 0;
+function nonNegativeSafeIntegerOrZero(value: number): number {
+  return isNonNegativeSafeInteger(value) ? value : 0;
 }
 
 function percentageOrZero(value: number): number {

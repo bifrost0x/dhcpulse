@@ -153,7 +153,9 @@ describe('analyzeWindowsFailover', () => {
 
   it.each([
     ['mcltMinutes', -1],
+    ['mcltMinutes', 0.5],
     ['stateSwitchoverMinutes', -1],
+    ['stateSwitchoverMinutes', Number.MAX_SAFE_INTEGER + 1],
     ['clockSkewSeconds', -1],
     ['plannedOutageMinutes', -1],
     ['loadBalancePercentage', -1],
@@ -173,6 +175,26 @@ describe('analyzeWindowsFailover', () => {
         evidence: [`${field}=${value}`],
       }),
     );
+    expect(result.timeline.every(({ afterMinutes }) => Number.isSafeInteger(afterMinutes))).toBe(
+      true,
+    );
+  });
+
+  it('blocks a state-switchover plus MCLT sum that exceeds safe integer arithmetic', () => {
+    const result = analyze({
+      mcltMinutes: 1,
+      stateSwitchoverMinutes: Number.MAX_SAFE_INTEGER,
+    });
+
+    expect(result.readiness).toBe('no-go');
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        id: 'failover-invalid-numeric-input',
+        severity: 'blocker',
+        evidence: ['safeTransitionMinutes=unsafe-sum'],
+      }),
+    );
+    expect(result.timeline).toEqual([]);
   });
 
   it.each([
