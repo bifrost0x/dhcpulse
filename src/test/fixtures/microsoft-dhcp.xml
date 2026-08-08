@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<d:DhcpServerExport xmlns:d="urn:example:dhcp" Version="1.0">
+  <d:Server>
+    <d:Name>dhcp01.example.com</d:Name>
+    <d:AuditLog><d:Enable>true</d:Enable><d:Path>C:\DhcpAudit</d:Path></d:AuditLog>
+  </d:Server>
+  <d:IPv4>
+    <d:OptionValues>
+      <d:OptionValue><d:OptionId>15</d:OptionId><d:Value>example.com</d:Value></d:OptionValue>
+    </d:OptionValues>
+    <d:Scopes>
+      <d:Scope>
+        <d:ScopeId>192.0.2.0</d:ScopeId>
+        <d:SubnetMask>255.255.255.0</d:SubnetMask>
+        <d:Name>Documentation LAN</d:Name>
+        <d:LeaseDuration>08:00:00</d:LeaseDuration>
+        <d:IPRanges>
+          <d:IPRange><d:StartRange>192.0.2.20</d:StartRange><d:EndRange>192.0.2.120</d:EndRange></d:IPRange>
+        </d:IPRanges>
+        <d:ExclusionRanges>
+          <d:ExclusionRange><d:StartRange>192.0.2.30</d:StartRange><d:EndRange>192.0.2.39</d:EndRange></d:ExclusionRange>
+        </d:ExclusionRanges>
+        <d:Reservations>
+          <d:Reservation><d:IPAddress>192.0.2.50</d:IPAddress><d:ClientId>02-00-5E-10-00-01</d:ClientId><d:Name>printer.example.com</d:Name></d:Reservation>
+        </d:Reservations>
+        <d:OptionValues>
+          <d:OptionValue><d:OptionId>6</d:OptionId><d:Value>192.0.2.53</d:Value></d:OptionValue>
+        </d:OptionValues>
+        <d:Policies><d:Policy><d:Name>Documentation clients</d:Name><d:Condition>VendorClass EQ example</d:Condition></d:Policy></d:Policies>
+        <d:DynamicDnsUpdate><d:Enabled>true</d:Enabled><d:DomainName>example.com</d:DomainName></d:DynamicDnsUpdate>
+      </d:Scope>
+    </d:Scopes>
+    <d:FailoverRelationships>
+      <d:FailoverRelationship><d:Name>example-ha</d:Name><d:PartnerServer>dhcp02.example.com</d:PartnerServer><d:Mode>LoadBalance</d:Mode></d:FailoverRelationship>
+    </d:FailoverRelationships>
+  </d:IPv4>
+  <d:IPv6>
+    <d:Scopes>
+      <d:Scope><d:Prefix>2001:db8:10::</d:Prefix><d:PrefixLength>64</d:PrefixLength></d:Scope>
+    </d:Scopes>
+  </d:IPv6>
+  <d:UnsupportedSetting><d:Opaque>opaque.example.com</d:Opaque></d:UnsupportedSetting>
+</d:DhcpServerExport>

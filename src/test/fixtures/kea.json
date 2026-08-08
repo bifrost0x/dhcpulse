@@ -1,0 +1,40 @@
+{
+  // A comment before the service object.
+  "Dhcp4": {
+    "valid-lifetime": 28800,
+    "ddns-send-updates": true,
+    "option-data": [
+      { "code": 15, "name": "domain-name", "data": "example.com" },
+      { "code": 160, "name": "example-url", "data": "https://example.com/#fragment" }
+    ],
+    "subnet4": [{
+      "id": 10,
+      "subnet": "192.0.2.0/24", # Kea also accepts shell-style comments.
+      "pools": [{ "pool": "192.0.2.20 - 192.0.2.120" }],
+      "reservations": [{
+        "hw-address": "02:00:5e:10:00:02",
+        "ip-address": "192.0.2.60",
+        "hostname": "kea-client.example.com"
+      }],
+      "option-data": [{ "code": 6, "name": "domain-name-servers", "data": "192.0.2.53" }],
+      "relay": { "ip-addresses": ["192.0.2.1"] }
+    }],
+    "hooks-libraries": [{
+      "library": "libdhcp_ha.so",
+      "parameters": { "high-availability": [{ "this-server-name": "kea-a", "mode": "hot-standby", "peers": [{ "name": "kea-b", "url": "https://example.com/ha" }] }] }
+    }],
+    "unsupported-example": { "opaque": "opaque.example.com" }
+  },
+  /* DHCPv6 remains separately representable. */
+  "Dhcp6": {
+    "preferred-lifetime": 3600,
+    "valid-lifetime": 7200,
+    "subnet6": [{
+      "id": 20,
+      "subnet": "2001:db8:20::/64",
+      "pools": [{ "pool": "2001:db8:20::100 - 2001:db8:20::1ff" }],
+      "reservations": [{ "duid": "00:04:00:01:02:03:04:05", "ip-addresses": ["2001:db8:20::50"] }],
+      "option-data": [{ "code": 23, "name": "dns-servers", "data": "2001:db8:20::53" }]
+    }]
+  }
+}
