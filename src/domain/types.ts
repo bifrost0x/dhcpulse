@@ -127,3 +127,108 @@ export interface ScopeDesignResult {
   scopes: ScopeCapacity[];
   findings: ScopeFinding[];
 }
+
+export type DhcpProtocol = 'dhcpv4' | 'dhcpv6';
+export type DhcpOptionValueType =
+  | 'ipv4'
+  | 'ipv4-list'
+  | 'string'
+  | 'uint8'
+  | 'uint16'
+  | 'uint32'
+  | 'boolean'
+  | 'domain-search'
+  | 'classless-routes'
+  | 'message-type'
+  | 'hex';
+
+export interface DhcpOptionDefinition {
+  protocol: DhcpProtocol;
+  code: number;
+  name: string;
+  aliases: string[];
+  valueType: DhcpOptionValueType;
+  repeatable: boolean;
+  description: string;
+  source: string;
+}
+
+export interface DhcpOptionEntry {
+  protocol: DhcpProtocol;
+  code: number;
+  value: unknown;
+}
+
+export interface DhcpOptionCodecResult {
+  hex: string;
+  value: unknown;
+  displayValue: string;
+  warnings: string[];
+  definition?: DhcpOptionDefinition;
+}
+
+export interface DhcpOptionValidationIssue {
+  key:
+    | 'duplicateSingleton'
+    | 'invalidValue'
+    | 't1NotBeforeT2'
+    | 't2NotBeforeLease'
+    | 'pxeContextMissing'
+    | 'classlessRouteWithoutRouter';
+  severity: 'error' | 'warning' | 'info';
+  protocol: DhcpProtocol;
+  code?: number;
+  message: string;
+}
+
+export type PxeArchitecture = 'bios-x86' | 'uefi-x86' | 'uefi-x64' | 'uefi-arm64' | 'http-x64';
+export type PxeDeploymentMode = 'none' | 'wds' | 'mdt' | 'mecm';
+
+export interface PxeAnalysisInput {
+  architecture: PxeArchitecture;
+  architectures?: PxeArchitecture[];
+  vendorClass?: string;
+  userClass?: string;
+  serverAddress?: string;
+  serverName?: string;
+  bootFile?: string;
+  proxyDhcp?: boolean;
+  authoritativeBootOptions?: boolean;
+  mode?: PxeDeploymentMode;
+  ipxeChainload?: boolean;
+  userClassPolicy?: boolean;
+  globalBootFile?: boolean;
+}
+
+export interface PxeFinding {
+  key:
+    | 'globalBootFileMixedArchitectures'
+    | 'option66Url'
+    | 'httpBootRequiresUrl'
+    | 'ipxeLoopRisk'
+    | 'proxyDhcpWithAuthoritativeOptions'
+    | 'missingServer'
+    | 'missingBootFile'
+    | 'directOptionsWithManagedDeployment';
+  severity: 'warning' | 'info';
+  message: string;
+}
+
+export interface PxeDecisionStep {
+  order: number;
+  key: string;
+  instruction: string;
+}
+
+export interface PxeAnalysisResult {
+  architectureCode: number;
+  architectureCodes: number[];
+  recommendedBootFileFamily: string;
+  findings: PxeFinding[];
+  decisionSteps: PxeDecisionStep[];
+  policyExamples: {
+    microsoftDhcpPowerShell: string;
+    keaJson: string;
+  };
+  reviewNotice: string;
+}
