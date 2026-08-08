@@ -117,7 +117,7 @@ export function validateDhcpOptions(
         'classlessRouteWithoutRouter',
         'warning',
         routeEntry,
-        'Some clients ignore option 3 when option 121 is present; review interoperability deliberately.',
+        'Clients that do not support option 121 may need option 3 to receive a default gateway.',
       ),
     );
   }
@@ -344,7 +344,9 @@ function decodeRoutes(bytes: number[]): string[] {
     offset += significantOctets;
     const gatewayBytes = bytes.slice(offset, offset + 4);
     offset += 4;
-    routes.push(`${bytesToIpv4(destinationBytes)}/${width} via ${bytesToIpv4(gatewayBytes)}`);
+    const mask = width === 0 ? 0 : (0xffffffff << (32 - width)) >>> 0;
+    const canonicalDestination = (readInteger(destinationBytes) & mask) >>> 0;
+    routes.push(`${formatIpv4(canonicalDestination)}/${width} via ${bytesToIpv4(gatewayBytes)}`);
   }
   return routes;
 }

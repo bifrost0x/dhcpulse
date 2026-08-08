@@ -19,12 +19,30 @@ describe('analyzePxe', () => {
     const result = analyzePxe({
       architecture: 'uefi-x64',
       vendorClass: 'PXEClient',
+      userClass: 'iPXE',
       serverName: 'pxe.example.test',
       bootFile: 'bootx64.efi',
     });
     expect(result.decisionSteps.map(({ order }) => order)).toEqual([1, 2, 3, 4, 5]);
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('REVIEW ONLY');
-    expect(result.policyExamples.keaJson).toContain('REVIEW ONLY');
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain('Add-DhcpServerv4Policy');
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain('Set-DhcpServerv4OptionValue');
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain('PXEClient:Arch:00007');
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain('-UserClass');
+
+    const kea = JSON.parse(result.policyExamples.keaJson) as {
+      notice: string;
+      'client-classes': Array<{ test: string; 'option-data': Array<{ code: number; data: string }> }>;
+    };
+    expect(kea.notice).toContain('REVIEW ONLY');
+    expect(kea['client-classes']).toHaveLength(2);
+    expect(kea['client-classes'][0]?.test).toContain('option[93].hex');
+    expect(kea['client-classes'][0]?.test).toContain('option[60].text');
+    expect(kea['client-classes'][1]?.test).toContain('option[77].text');
+    expect(kea['client-classes'][1]?.['option-data']).toEqual([
+      { code: 66, data: 'pxe.example.test' },
+      { code: 67, data: 'bootx64.efi' },
+    ]);
     expect(result.reviewNotice).toMatch(/environment review/i);
   });
 
@@ -55,7 +73,6 @@ describe('analyzePxe', () => {
         serverAddress: '192.0.2.10',
         bootFile: 'ipxe.efi',
         ipxeChainload: true,
-        userClass: 'iPXE',
         userClassPolicy: false,
       }).findings.map(({ key }) => key),
     ).toContain('ipxeLoopRisk');

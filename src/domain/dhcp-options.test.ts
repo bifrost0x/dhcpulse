@@ -71,6 +71,14 @@ describe('DHCP option codecs', () => {
     );
   });
 
+  it.each([
+    ['01ffc0000201', '128.0.0.0/1 via 192.0.2.1'],
+    ['110a14ffc0000201', '10.20.128.0/17 via 192.0.2.1'],
+    ['1fc00002ffc0000201', '192.0.2.254/31 via 192.0.2.1'],
+  ])('masks host bits while decoding non-octet-aligned route %s', (hex, expected) => {
+    expect(decodeDhcpOption({ protocol: 'dhcpv4', code: 121, hex }).displayValue).toBe(expected);
+  });
+
   it('rejects malformed hex and invalid typed values', () => {
     expect(() => decodeDhcpOption({ protocol: 'dhcpv4', code: 1, hex: 'abc' })).toThrow(/even/i);
     expect(() => decodeDhcpOption({ protocol: 'dhcpv4', code: 1, hex: 'zz' })).toThrow(/hex/i);
@@ -95,6 +103,19 @@ describe('DHCP option codecs', () => {
     expect(encodeDhcpOption({ protocol: 'dhcpv6', code: 8, value: 65535 }).hex).toBe('ffff');
     expect(encodeDhcpOption({ protocol: 'dhcpv4', code: 12, value: 'host-a' }).hex).toBe('686f73742d61');
     expect(encodeDhcpOption({ protocol: 'dhcpv6', code: 999, value: true }).hex).toBe('01');
+  });
+
+  it('accepts exact integer and RFC 3397 boundaries while rejecting values immediately outside them', () => {
+    expect(encodeDhcpOption({ protocol: 'dhcpv4', code: 51, value: 0 }).hex).toBe('00000000');
+    expect(encodeDhcpOption({ protocol: 'dhcpv4', code: 51, value: 4_294_967_295 }).hex).toBe('ffffffff');
+    expect(() => encodeDhcpOption({ protocol: 'dhcpv4', code: 51, value: -1 })).toThrow(/32-bit/i);
+    expect(() => encodeDhcpOption({ protocol: 'dhcpv4', code: 51, value: 4_294_967_296 })).toThrow(/32-bit/i);
+
+    const longestName = ['a'.repeat(63), 'b'.repeat(63), 'c'.repeat(63), 'd'.repeat(61)].join('.');
+    expect(encodeDhcpOption({ protocol: 'dhcpv4', code: 119, value: longestName }).hex).toHaveLength(510);
+    expect(() => encodeDhcpOption({ protocol: 'dhcpv4', code: 121, value: '10.0.0.0/33 via 192.0.2.1' })).toThrow(
+      /between 0 and 32/i,
+    );
   });
 });
 
@@ -133,5 +154,14 @@ describe('validateDhcpOptions', () => {
         { protocol: 'dhcpv4', code: 59, value: 3600 },
       ]).map(({ key }) => key),
     ).toEqual(['t2NotBeforeLease']);
+  });
+
+  it('explains the option 121 warning as a legacy-client interoperability risk', () => {
+    const issue = validateDhcpOptions([
+      { protocol: 'dhcpv4', code: 121, value: '0.0.0.0/0 via 192.0.2.1' },
+    ]).find(({ key }) => key === 'classlessRouteWithoutRouter');
+    expect(issue?.message).toBe(
+      'Clients that do not support option 121 may need option 3 to receive a default gateway.',
+    );
   });
 });

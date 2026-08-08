@@ -27,8 +27,14 @@ export function analyzePxe(input: PxeAnalysisInput): PxeAnalysisResult {
   if (input.architecture === 'http-x64' && !isHttpUrl(input.bootFile)) {
     findings.push(finding('httpBootRequiresUrl', 'HTTP Boot requires an HTTP(S) boot-file URL.'));
   }
-  if (input.ipxeChainload && input.userClass?.toLocaleLowerCase('en-US') === 'ipxe' && !input.userClassPolicy) {
-    findings.push(finding('ipxeLoopRisk', 'Branch on the iPXE user class so an iPXE client is not chainloaded repeatedly.'));
+  if (input.ipxeChainload && !input.userClassPolicy) {
+    const observedClass = input.userClass?.toLocaleLowerCase('en-US') === 'ipxe' ? ' The observed user class is iPXE.' : '';
+    findings.push(
+      finding(
+        'ipxeLoopRisk',
+        `Branch on the iPXE user class so a chainloaded client is not chainloaded repeatedly.${observedClass}`,
+      ),
+    );
   }
   if (input.proxyDhcp && input.authoritativeBootOptions) {
     findings.push(
@@ -88,29 +94,43 @@ function isHttpUrl(value: string | undefined): boolean {
 function microsoftExample(input: PxeAnalysisInput, codes: number[]): string {
   const server = input.serverName ?? input.serverAddress ?? '<review-server>';
   const bootFile = input.bootFile ?? '<review-boot-file>';
+  const architectureClasses = codes
+    .map((code) => `${input.vendorClass ?? 'PXEClient'}:Arch:${String(code).padStart(5, '0')}*`)
+    .join(',');
+  const userClassCondition = input.userClass ? ` -UserClass 'EQ,${escapePowerShell(input.userClass)}'` : '';
   return [
     '# REVIEW ONLY - do not apply without environment review',
-    `$ArchitectureCodes = @(${codes.join(', ')})`,
+    "$ScopeId = '<REVIEW-SCOPE-ID>'",
+    "$PolicyName = '<REVIEW-POLICY-NAME>'",
     `$BootServer = '${escapePowerShell(server)}'`,
     `$BootFile = '${escapePowerShell(bootFile)}'`,
-    '# Create architecture/vendor/user-class conditions and test policy precedence before use.',
+    `Add-DhcpServerv4Policy -ScopeId $ScopeId -Name $PolicyName -Condition AND -VendorClass 'EQ,${escapePowerShell(architectureClasses)}'${userClassCondition}`,
+    'Set-DhcpServerv4OptionValue -ScopeId $ScopeId -PolicyName $PolicyName -OptionId 66 -Value $BootServer',
+    'Set-DhcpServerv4OptionValue -ScopeId $ScopeId -PolicyName $PolicyName -OptionId 67 -Value $BootFile',
   ].join('\n');
 }
 
 function keaExample(input: PxeAnalysisInput, codes: number[]): string {
+  const architectureTest = codes.map((code) => `option[93].hex == 0x${code.toString(16).padStart(4, '0')}`).join(' or ');
+  const vendorTest = input.vendorClass ? ` and option[60].text == '${escapeKeaExpression(input.vendorClass)}'` : '';
+  const userClassTest = input.userClass ? ` and option[77].text == '${escapeKeaExpression(input.userClass)}'` : '';
   return JSON.stringify(
     {
       'review-only': true,
       notice: 'REVIEW ONLY - do not deploy without environment review',
-      warning: 'Do not deploy without environment review',
-      match: {
-        'client-system-architecture': codes,
-        ...(input.vendorClass ? { 'vendor-class': input.vendorClass } : {}),
-        ...(input.userClass ? { 'user-class': input.userClass } : {}),
-      },
-      'option-data': [
-        { code: 66, data: input.serverName ?? input.serverAddress ?? '<review-server>' },
-        { code: 67, data: input.bootFile ?? '<review-boot-file>' },
+      'client-classes': [
+        {
+          name: '<REVIEW-ARCHITECTURE-CLASS>',
+          test: `(${architectureTest})${vendorTest}`,
+        },
+        {
+          name: '<REVIEW-BOOT-POLICY>',
+          test: `member('<REVIEW-ARCHITECTURE-CLASS>')${userClassTest}`,
+          'option-data': [
+            { code: 66, data: input.serverName ?? input.serverAddress ?? '<review-server>' },
+            { code: 67, data: input.bootFile ?? '<review-boot-file>' },
+          ],
+        },
       ],
     },
     null,
@@ -120,4 +140,8 @@ function keaExample(input: PxeAnalysisInput, codes: number[]): string {
 
 function escapePowerShell(value: string): string {
   return value.replaceAll("'", "''");
+}
+
+function escapeKeaExpression(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 }
