@@ -14,7 +14,7 @@ The shell does not share scenario or import state between tools. Reset remounts 
 
 ## Domain engines
 
-The calculators and assessment engines under `src/domain/` are deterministic functions with typed inputs and outputs. They cover IPv4 capacity, lease timing, option handling, PXE decisions, failover, DHCPv6, diagnostics, security rules, semantic comparison, and redaction. UI components do not reproduce those decision rules.
+Most planning and validation logic lives in deterministic, typed engines under `src/domain/`. These engines cover IPv4 capacity, lease timing, option handling, PXE decisions, failover, DHCPv6, diagnostics, security rules, semantic comparison, and redaction. Tool components primarily adapt form state and render domain results, but the presentation layer also owns limited orchestration and derived analyzer observations, such as whether an imported configuration contains a detected failover relationship or enabled audit logging. Those observations are bounded heuristics, not complete vendor validation.
 
 Most domain engines are pure and independent of React and the DOM. Browser-specific edges are explicit: the Microsoft XML adapter uses `DOMParser`, and download helpers use `Blob` and temporary object URLs. File selection and `File.text()` remain in the tool components.
 
