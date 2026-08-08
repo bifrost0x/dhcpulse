@@ -61,6 +61,11 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
       : 'dhcpv4';
     const prefixLength = firstText(element, ['prefixlength']);
     const mask = firstText(element, ['subnetmask']);
+    const explicitRange = elements(element, ['iprange', 'range', 'addressrange']).find(
+      (candidate) => !ancestryNames(candidate).some((name) => name.includes('exclusion')),
+    );
+    const startRange = explicitRange ? firstText(explicitRange, ['startrange', 'startaddress', 'start']) : undefined;
+    const endRange = explicitRange ? firstText(explicitRange, ['endrange', 'endaddress', 'end']) : undefined;
     const cidr = scopeAddress.includes('/')
       ? scopeAddress
       : `${scopeAddress}/${protocol === 'dhcpv4' ? maskToPrefix(mask) : numberOr(prefixLength, 64)}`;
@@ -69,6 +74,9 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
       provenance: provenance(format, xmlPath(element)),
       protocol,
       cidr,
+      ...(protocol === 'dhcpv4' ? optional('subnetMask', mask) : {}),
+      ...(protocol === 'dhcpv4' ? optional('startRange', startRange) : {}),
+      ...(protocol === 'dhcpv4' ? optional('endRange', endRange) : {}),
       ...optional('name', firstText(element, ['name'])),
       ...optional('state', firstText(element, ['state'])),
       ...optionalNumber('leaseLifetimeSeconds', durationSeconds(firstText(element, ['leaseduration']))),

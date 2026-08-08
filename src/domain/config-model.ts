@@ -38,6 +38,9 @@ export interface DhcpServer extends NormalizedEntity {
 export interface DhcpScope extends NormalizedEntity {
   protocol: 'dhcpv4' | 'dhcpv6';
   cidr: string;
+  subnetMask?: string;
+  startRange?: string;
+  endRange?: string;
   name?: string;
   state?: string;
   leaseLifetimeSeconds?: number;

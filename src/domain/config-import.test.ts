@@ -88,6 +88,33 @@ describe('importDhcpConfiguration', () => {
     expect(dnsmasqConfig.policies.some(({ name }) => name === 'docs')).toBe(true);
   });
 
+  it('preserves explicit Microsoft IPv4 range facts required for guarded changes', () => {
+    const microsoft = importDhcpConfiguration({ text: microsoftXml, format: 'microsoft-xml' }).configuration;
+
+    expect(microsoft.servers[0]).toMatchObject({ name: 'dhcp01.example.com' });
+    expect(microsoft.ipv4Scopes[0]).toMatchObject({
+      cidr: '192.0.2.0/24',
+      subnetMask: '255.255.255.0',
+      startRange: '192.0.2.20',
+      endRange: '192.0.2.120',
+      leaseLifetimeSeconds: 28_800,
+    });
+    expect(microsoft.exclusions[0]).toMatchObject({ start: '192.0.2.30', end: '192.0.2.39' });
+    expect(microsoft.reservations[0]).toMatchObject({ address: '192.0.2.50', hostname: 'printer.example.com' });
+    expect(microsoft.options).toContainEqual(expect.objectContaining({ code: 6, level: 'scope', value: '192.0.2.53' }));
+    expect(microsoft.failoverRelationships[0]).toMatchObject({ name: 'example-ha', partner: 'dhcp02.example.com' });
+  });
+
+  it('does not infer Microsoft generation facts that are absent from the export', () => {
+    const text = '<DhcpServerExport><IPv4><Scopes><Scope><ScopeId>198.51.100.0</ScopeId><SubnetMask>255.255.255.0</SubnetMask></Scope></Scopes></IPv4></DhcpServerExport>';
+
+    const scope = importDhcpConfiguration({ text, format: 'microsoft-xml' }).configuration.ipv4Scopes[0];
+
+    expect(scope).toMatchObject({ cidr: '198.51.100.0/24', subnetMask: '255.255.255.0' });
+    expect(scope).not.toHaveProperty('startRange');
+    expect(scope).not.toHaveProperty('endRange');
+  });
+
   it('counts arbitrary unsupported XML elements and nested Kea keys without echoing values', () => {
     const xml = microsoftXml.replaceAll('UnsupportedSetting', 'VendorOpaqueSetting');
     const nestedKea = `{
