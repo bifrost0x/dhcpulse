@@ -37,8 +37,9 @@ describe('analyzeWindowsFailover', () => {
       'normal',
       'communication-interrupted',
       'partner-down',
-      'recovery',
+      'mclt-full-pool-eligible',
     ]);
+    expect(result.timeline.at(-1)?.rationale).toContain('If the partner remains unavailable');
     expect(result.findings).toEqual([
       expect.objectContaining({
         id: 'windows-failover-ipv4-only',
@@ -100,35 +101,20 @@ describe('analyzeWindowsFailover', () => {
     );
   });
 
-  it('warns on invalid timing, percentages, relay duplication, and modeled outage', () => {
+  it('warns on state timing, relay duplication, and a modeled outage overrun', () => {
     const loadBalance = analyze({
-      mcltMinutes: 0,
-      stateSwitchoverMinutes: -1,
+      mcltMinutes: 60,
+      stateSwitchoverMinutes: 30,
       duplicateRelayForwarding: true,
-      loadBalancePercentage: 100,
-      plannedOutageMinutes: 1,
-    });
-    const hotStandby = analyze({
-      mode: 'hot-standby',
-      reservePercentage: 101,
-      plannedOutageMinutes: 151,
+      plannedOutageMinutes: 91,
     });
 
     expect(loadBalance.findings.map(({ id }) => id)).toEqual([
       'failover-duplicate-relay-forwarding',
-      'failover-invalid-load-balance-percentage',
-      'failover-mclt-not-positive',
       'failover-outage-exceeds-safe-window',
       'failover-state-switchover-below-mclt',
       'windows-failover-ipv4-only',
     ]);
-    expect(hotStandby.partnerRoles.secondary).toBe('standby-reserve-101-percent');
-    expect(hotStandby.findings.map(({ id }) => id)).toContain(
-      'failover-invalid-reserve-percentage',
-    );
-    expect(hotStandby.findings.map(({ id }) => id)).toContain(
-      'failover-outage-exceeds-safe-window',
-    );
   });
 
   it('blocks missing partner paths and lack of client reachability', () => {
@@ -163,5 +149,45 @@ describe('analyzeWindowsFailover', () => {
       'NaN',
     );
     expect(result.timeline.every(({ afterMinutes }) => Number.isFinite(afterMinutes))).toBe(true);
+  });
+
+  it.each([
+    ['mcltMinutes', -1],
+    ['stateSwitchoverMinutes', -1],
+    ['clockSkewSeconds', -1],
+    ['plannedOutageMinutes', -1],
+    ['loadBalancePercentage', -1],
+    ['loadBalancePercentage', 101],
+    ['loadBalancePercentage', 50.5],
+    ['reservePercentage', -1],
+    ['reservePercentage', 101],
+    ['reservePercentage', 5.5],
+  ] as const)('blocks invalid numeric semantics for %s=%s', (field, value) => {
+    const result = analyze({ [field]: value });
+
+    expect(result.readiness).toBe('no-go');
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        id: 'failover-invalid-numeric-input',
+        severity: 'blocker',
+        evidence: [`${field}=${value}`],
+      }),
+    );
+  });
+
+  it.each([
+    {
+      percentage: 0,
+      roles: { primary: 'inactive-0-percent', secondary: 'active-100-percent' },
+    },
+    {
+      percentage: 100,
+      roles: { primary: 'active-100-percent', secondary: 'inactive-0-percent' },
+    },
+  ])('accepts the load-balance endpoint $percentage', ({ percentage, roles }) => {
+    const result = analyze({ loadBalancePercentage: percentage });
+
+    expect(result.readiness).toBe('ready');
+    expect(result.partnerRoles).toEqual(roles);
   });
 });

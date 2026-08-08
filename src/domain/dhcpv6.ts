@@ -11,6 +11,7 @@ import type {
 const RFC_9915 = 'https://www.rfc-editor.org/rfc/rfc9915';
 const RFC_4861 = 'https://www.rfc-editor.org/rfc/rfc4861';
 const RFC_4862 = 'https://www.rfc-editor.org/rfc/rfc4862';
+const RFC_9762 = 'https://www.rfc-editor.org/rfc/rfc9762';
 const WINDOWS_FAILOVER_SOURCE =
   'https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-failover';
 const severityRank: Record<Severity, number> = { blocker: 0, warning: 1, info: 2 };
@@ -38,7 +39,32 @@ export function analyzeDhcpv6(input: Dhcpv6Input): Dhcpv6Result {
     );
   }
 
-  if (input.preferredLifetimeSeconds > input.validLifetimeSeconds) {
+  const timeEntries = [
+    ['preferredLifetimeSeconds', input.preferredLifetimeSeconds],
+    ['validLifetimeSeconds', input.validLifetimeSeconds],
+    ['t1Seconds', input.t1Seconds],
+    ['t2Seconds', input.t2Seconds],
+  ] as const;
+  const invalidTimeEvidence = timeEntries
+    .filter(([, value]) => !isUnsigned32Bit(value))
+    .map(([field, value]) => `${field}=${String(value)}`);
+  const timeValuesValid = invalidTimeEvidence.length === 0;
+  if (!timeValuesValid) {
+    findings.push(
+      finding(
+        'dhcpv6-invalid-time-value',
+        'blocker',
+        'DHCPv6 lifetimes and T1/T2 values must be unsigned 32-bit integers.',
+        invalidTimeEvidence,
+        RFC_9915,
+      ),
+    );
+  }
+
+  if (
+    timeValuesValid &&
+    input.preferredLifetimeSeconds > input.validLifetimeSeconds
+  ) {
     findings.push(
       finding(
         'dhcpv6-preferred-lifetime-exceeds-valid',
@@ -126,7 +152,7 @@ export function analyzeDhcpv6(input: Dhcpv6Input): Dhcpv6Result {
         'warning',
         'The modeled P signal contradicts a mode that does not use prefix delegation.',
         [`mode=${input.mode}`, 'raFlagP=true'],
-        RFC_9915,
+        RFC_9762,
       ),
     );
   }
@@ -142,11 +168,14 @@ export function analyzeDhcpv6(input: Dhcpv6Input): Dhcpv6Result {
         'warning',
         'Prefix delegation has neither the modeled P signal nor an M/O compatibility signal.',
         ['mode=prefix-delegation', 'raFlagP=false', 'raFlagM=false', 'raFlagO=false'],
-        RFC_9915,
+        RFC_9762,
       ),
     );
   }
-  if (input.mode !== 'slaac-only' && (!input.duidPresent || !input.iaidPresent)) {
+  if (
+    (input.mode === 'stateful' || input.mode === 'prefix-delegation') &&
+    (!input.duidPresent || !input.iaidPresent)
+  ) {
     findings.push(
       finding(
         'dhcpv6-client-identity-missing',
@@ -179,7 +208,12 @@ export function analyzeDhcpv6(input: Dhcpv6Input): Dhcpv6Result {
       ),
     );
   }
-  if (input.t1Seconds !== 0 && input.t2Seconds !== 0 && input.t1Seconds >= input.t2Seconds) {
+  if (
+    timeValuesValid &&
+    input.t1Seconds !== 0 &&
+    input.t2Seconds !== 0 &&
+    input.t1Seconds > input.t2Seconds
+  ) {
     findings.push(
       finding(
         'dhcpv6-t1-not-before-t2',
@@ -190,7 +224,11 @@ export function analyzeDhcpv6(input: Dhcpv6Input): Dhcpv6Result {
       ),
     );
   }
-  if (input.t2Seconds !== 0 && input.t2Seconds >= input.validLifetimeSeconds) {
+  if (
+    timeValuesValid &&
+    input.t2Seconds !== 0 &&
+    input.t2Seconds > input.validLifetimeSeconds
+  ) {
     findings.push(
       finding(
         'dhcpv6-t2-not-before-valid-lifetime',
@@ -241,26 +279,44 @@ function isValidPrefixLength(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= 128;
 }
 
+function isUnsigned32Bit(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 0xffff_ffff;
+}
+
 function checklist(input: Dhcpv6Input): ValidationChecklistItem[] {
   return [
     item(
       'preferred-valid-lifetimes',
-      input.preferredLifetimeSeconds <= input.validLifetimeSeconds,
-      'Preferred lifetime does not exceed valid lifetime.',
+      isUnsigned32Bit(input.preferredLifetimeSeconds) &&
+        isUnsigned32Bit(input.validLifetimeSeconds) &&
+        input.preferredLifetimeSeconds <= input.validLifetimeSeconds,
+      'Preferred and valid lifetimes are unsigned 32-bit values in valid order.',
     ),
     item(
       't1-t2-order',
-      input.t1Seconds === 0 || input.t2Seconds === 0 || input.t1Seconds < input.t2Seconds,
-      'T1 occurs before T2 when both server timer hints are nonzero.',
+      isUnsigned32Bit(input.t1Seconds) &&
+        isUnsigned32Bit(input.t2Seconds) &&
+        (input.t1Seconds === 0 || input.t2Seconds === 0 || input.t1Seconds <= input.t2Seconds),
+      'T1 does not exceed T2 when both server timer hints are nonzero.',
     ),
     item(
       't2-valid-lifetime',
-      input.t2Seconds === 0 || input.t2Seconds < input.validLifetimeSeconds,
-      'T2 occurs before the valid lifetime when the server timer hint is nonzero.',
+      isUnsigned32Bit(input.t2Seconds) &&
+        isUnsigned32Bit(input.validLifetimeSeconds) &&
+        (input.t2Seconds === 0 || input.t2Seconds <= input.validLifetimeSeconds),
+      'T2 does not exceed the valid lifetime when the server timer hint is nonzero.',
     ),
     item('on-link-prefix', input.onLinkPrefixLength >= 0 && input.onLinkPrefixLength <= 128, 'On-link prefix length is within IPv6 bounds.'),
-    item('client-duid', input.mode === 'slaac-only' || input.duidPresent, 'DUID is present when DHCPv6 is expected.'),
-    item('client-iaid', input.mode === 'slaac-only' || input.iaidPresent, 'IAID is present when DHCPv6 is expected.'),
+    item(
+      'client-duid',
+      !['stateful', 'prefix-delegation'].includes(input.mode) || input.duidPresent,
+      'DUID is present for stateful address or prefix identity associations.',
+    ),
+    item(
+      'client-iaid',
+      !['stateful', 'prefix-delegation'].includes(input.mode) || input.iaidPresent,
+      'IAID is present for stateful address or prefix identity associations.',
+    ),
     item('dns-option', input.mode === 'slaac-only' || input.dnsOptionPresent, 'DNS option is present when DHCPv6 is expected.'),
     item('relay-link-address', !input.relayUsed || Boolean(input.relayLinkAddress?.trim()), 'Relay link-address is present when relaying is used.'),
   ];

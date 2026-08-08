@@ -6,6 +6,8 @@ import {
 import type {
   DiagnosticCauseId,
   DiagnosticEvidenceStep,
+  DiagnosticScoreContribution,
+  DiagnosticValidationFinding,
   DhcpDiagnosticInput,
   DhcpDiagnosticResult,
   DhcpSecurityFinding,
@@ -15,8 +17,7 @@ import type {
 } from './types';
 
 interface CauseAccumulator {
-  score: number;
-  evidence: string[];
+  contributions: DiagnosticScoreContribution[];
 }
 
 const severityRank: Record<Severity, number> = { blocker: 0, warning: 1, info: 2 };
@@ -30,6 +31,7 @@ export function diagnoseDhcp(input: DhcpDiagnosticInput): DhcpDiagnosticResult {
     wiresharkFilters: wiresharkFilters(input),
     commands: commands(input),
     securityFindings: securityFindings(input),
+    validationFindings: validationFindings(input),
   };
 }
 
@@ -39,9 +41,10 @@ function rankCauses(input: DhcpDiagnosticInput): RankedDiagnosticCause[] {
   const has = (symptom: DhcpDiagnosticInput['symptoms'][number]) =>
     input.symptoms.includes(symptom);
   const add = (id: DiagnosticCauseId, score: number, evidence: string) => {
-    const current = scores.get(id) ?? { score: 0, evidence: [] };
-    current.score += score;
-    if (!current.evidence.includes(evidence)) current.evidence.push(evidence);
+    const current = scores.get(id) ?? { contributions: [] };
+    if (!current.contributions.some((contribution) => contribution.evidence === evidence)) {
+      current.contributions.push({ evidence, weight: score });
+    }
     scores.set(id, current);
   };
 
@@ -89,7 +92,7 @@ function rankCauses(input: DhcpDiagnosticInput): RankedDiagnosticCause[] {
   if (serverIds.length > 1) {
     add('rogue-or-duplicate-server', 200, `serverIds=${serverIds.join(',')}`);
   }
-  if (input.freePoolPercentage <= 5) {
+  if (isValidFreePoolPercentage(input.freePoolPercentage) && input.freePoolPercentage <= 5) {
     add('address-pool-exhaustion', 150, `freePoolPercentage=${input.freePoolPercentage}`);
   }
   if (input.declineSeen) {
@@ -116,14 +119,18 @@ function rankCauses(input: DhcpDiagnosticInput): RankedDiagnosticCause[] {
   }
 
   return [...scores.entries()]
-    .map(([id, entry]) => ({
-      id,
-      title: diagnosticCauseCatalog[id].title,
-      score: entry.score,
-      rationale: diagnosticCauseCatalog[id].rationale,
-      matchedEvidence: entry.evidence,
-      source: diagnosticCauseCatalog[id].source,
-    }))
+    .map(([id, entry]) => {
+      const contributions = [...entry.contributions];
+      return {
+        id,
+        title: diagnosticCauseCatalog[id].title,
+        score: contributions.reduce((sum, contribution) => sum + contribution.weight, 0),
+        rationale: diagnosticCauseCatalog[id].rationale,
+        matchedEvidence: contributions.map(({ evidence }) => evidence),
+        contributions,
+        source: diagnosticCauseCatalog[id].source,
+      };
+    })
     .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
 }
 
@@ -157,7 +164,10 @@ function evidenceSteps(
       source: 'https://www.rfc-editor.org/rfc/rfc4703',
     });
   }
-  if (input.freePoolPercentage <= 10 || input.symptoms.includes('pool-exhaustion')) {
+  if (
+    (isValidFreePoolPercentage(input.freePoolPercentage) && input.freePoolPercentage <= 10) ||
+    input.symptoms.includes('pool-exhaustion')
+  ) {
     steps.push({
       id: 'inspect-scope-capacity',
       instruction: 'Review scope statistics, exclusions, reservations, active leases, and DECLINE records.',
@@ -193,13 +203,6 @@ function wiresharkFilters(input: DhcpDiagnosticInput): string[] {
 
 function commands(input: DhcpDiagnosticInput): string[] {
   const selected = new Set<string>(['ipconfig /all']);
-  if (
-    input.symptoms.some((symptom) =>
-      ['apipa', 'no-offer', 'renewal-failure'].includes(symptom),
-    )
-  ) {
-    selected.add('ipconfig /renew');
-  }
   if (input.serverPlatform === 'windows') {
     selected.add('Get-DhcpServerv4Scope');
     selected.add('Get-DhcpServerv4ScopeStatistics');
@@ -237,7 +240,10 @@ function securityFindings(input: DhcpDiagnosticInput): DhcpSecurityFinding[] {
     if (serverIds.length > 1) evidence.push(`serverIds=${serverIds.join(',')}`);
     add('security-rogue-dhcp-server', 'blocker', evidence);
   }
-  if (input.freePoolPercentage <= 5 || input.declineSeen) {
+  if (
+    (isValidFreePoolPercentage(input.freePoolPercentage) && input.freePoolPercentage <= 5) ||
+    input.declineSeen
+  ) {
     add('security-starvation-or-exhaustion', 'warning', [
       `freePoolPercentage=${input.freePoolPercentage}`,
       `declineSeen=${input.declineSeen}`,
@@ -275,4 +281,22 @@ function distinctServerIds(input: DhcpDiagnosticInput): string[] {
   return [...new Set(input.serverIds.map((id) => id.trim()).filter(Boolean))].sort((left, right) =>
     left.localeCompare(right),
   );
+}
+
+function validationFindings(input: DhcpDiagnosticInput): DiagnosticValidationFinding[] {
+  if (isValidFreePoolPercentage(input.freePoolPercentage)) return [];
+  return [
+    {
+      id: 'diagnostics-invalid-free-pool-percentage',
+      severity: 'blocker',
+      rationale: 'Free pool percentage must be a finite value from 0 through 100.',
+      evidence: [`freePoolPercentage=${String(input.freePoolPercentage)}`],
+      source:
+        'https://learn.microsoft.com/en-us/powershell/module/dhcpserver/get-dhcpserverv4scopestatistics',
+    },
+  ];
+}
+
+function isValidFreePoolPercentage(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 100;
 }

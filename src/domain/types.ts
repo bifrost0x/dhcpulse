@@ -286,7 +286,11 @@ export interface FailoverPartnerRoles {
 }
 
 export interface FailoverTimelineStep {
-  state: 'normal' | 'communication-interrupted' | 'partner-down' | 'recovery';
+  state:
+    | 'normal'
+    | 'communication-interrupted'
+    | 'partner-down'
+    | 'mclt-full-pool-eligible';
   afterMinutes: number;
   rationale: string;
 }
@@ -336,6 +340,7 @@ export interface Dhcpv6Input {
 
 export type Dhcpv6FindingId =
   | 'dhcpv6-invalid-prefix-length'
+  | 'dhcpv6-invalid-time-value'
   | 'dhcpv6-preferred-lifetime-exceeds-valid'
   | 'dhcpv6-delegated-prefix-longer-than-request'
   | 'dhcpv6-slash64-capacity-unavailable'
@@ -435,7 +440,13 @@ export interface RankedDiagnosticCause {
   score: number;
   rationale: string;
   matchedEvidence: string[];
+  contributions: DiagnosticScoreContribution[];
   source: string;
+}
+
+export interface DiagnosticScoreContribution {
+  evidence: string;
+  weight: number;
 }
 
 export interface DiagnosticEvidenceStep {
@@ -459,10 +470,15 @@ export type DhcpSecurityFindingId =
 
 export type DhcpSecurityFinding = ExplainableFinding<DhcpSecurityFindingId>;
 
+export type DiagnosticValidationFinding = ExplainableFinding<
+  'diagnostics-invalid-free-pool-percentage'
+>;
+
 export interface DhcpDiagnosticResult {
   rankedCauses: RankedDiagnosticCause[];
   evidenceSteps: DiagnosticEvidenceStep[];
   wiresharkFilters: string[];
   commands: string[];
   securityFindings: DhcpSecurityFinding[];
+  validationFindings: DiagnosticValidationFinding[];
 }

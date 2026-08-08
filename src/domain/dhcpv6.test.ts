@@ -54,6 +54,23 @@ describe('analyzeDhcpv6', () => {
     expect(result.findings).toEqual([]);
   });
 
+  it('accepts equal nonzero T1/T2 and T2/valid-lifetime boundaries', () => {
+    const result = analyze({
+      preferredLifetimeSeconds: 3000,
+      t1Seconds: 3000,
+      t2Seconds: 3000,
+      validLifetimeSeconds: 3000,
+    });
+
+    expect(result.readiness).toBe('ready');
+    expect(result.findings).toEqual([]);
+    expect(
+      result.validationChecklist
+        .filter(({ key }) => ['t1-t2-order', 't2-valid-lifetime'].includes(key))
+        .every(({ passed }) => passed),
+    ).toBe(true);
+  });
+
   it.each([
     { delegatedPoolPrefix: 56, delegatedSize: 64, exact: '256', numeric: 256 },
     { delegatedPoolPrefix: 60, delegatedSize: 64, exact: '16', numeric: 16 },
@@ -126,10 +143,25 @@ describe('analyzeDhcpv6', () => {
     });
 
     expect(pWithoutPd.findings).toContainEqual(
-      expect.objectContaining({ id: 'dhcpv6-p-flag-without-prefix-delegation' }),
+      expect.objectContaining({
+        id: 'dhcpv6-p-flag-without-prefix-delegation',
+        source: 'https://www.rfc-editor.org/rfc/rfc9762',
+      }),
     );
     expect(pdWithoutSignal.findings).toContainEqual(
-      expect.objectContaining({ id: 'dhcpv6-prefix-delegation-signal-missing' }),
+      expect.objectContaining({
+        id: 'dhcpv6-prefix-delegation-signal-missing',
+        source: 'https://www.rfc-editor.org/rfc/rfc9762',
+      }),
+    );
+  });
+
+  it('does not require DUID or IAID for stateless Information-request', () => {
+    const result = analyze({ duidPresent: false, iaidPresent: false });
+
+    expect(result.readiness).toBe('ready');
+    expect(result.findings.map(({ id }) => id)).not.toContain(
+      'dhcpv6-client-identity-missing',
     );
   });
 
@@ -153,7 +185,7 @@ describe('analyzeDhcpv6', () => {
       preferredLifetimeSeconds: 2000,
       t1Seconds: 4000,
       t2Seconds: 3000,
-      validLifetimeSeconds: 3000,
+      validLifetimeSeconds: 2999,
     });
 
     expect(result.findings.map(({ id }) => id)).toEqual([
@@ -176,6 +208,8 @@ describe('analyzeDhcpv6', () => {
 
   it('warns on missing client identity and an assumed Windows failover relationship', () => {
     const result = analyze({
+      mode: 'stateful',
+      raFlags: { m: true, o: true, a: false, p: false },
       duidPresent: false,
       iaidPresent: false,
       platform: 'windows',
@@ -225,5 +259,24 @@ describe('analyzeDhcpv6', () => {
       }),
     );
     expect(result.delegatedPrefixCapacity).toBeNull();
+  });
+
+  it.each([
+    ['preferredLifetimeSeconds', Number.NaN],
+    ['validLifetimeSeconds', Number.POSITIVE_INFINITY],
+    ['t1Seconds', -1],
+    ['t2Seconds', 1.5],
+    ['preferredLifetimeSeconds', 0x1_0000_0000],
+  ] as const)('blocks invalid unsigned 32-bit timer %s', (field, value) => {
+    const result = analyze({ [field]: value });
+
+    expect(result.readiness).toBe('no-go');
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        id: 'dhcpv6-invalid-time-value',
+        severity: 'blocker',
+        evidence: [`${field}=${String(value)}`],
+      }),
+    );
   });
 });

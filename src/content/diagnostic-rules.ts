@@ -113,7 +113,7 @@ export const securityRuleCatalog: Record<DhcpSecurityFindingId, RuleContent> = {
   'security-ra-guard-disabled': {
     title: 'RA Guard is disabled',
     rationale: 'RA Guard limits unauthorized Router Advertisements on access-layer ports.',
-    source: 'https://www.rfc-editor.org/rfc/rfc6105',
+    source: 'https://www.rfc-editor.org/rfc/rfc7113',
   },
   'security-backup-restore-unverified': {
     title: 'Backup and restore readiness is unverified',
@@ -129,7 +129,6 @@ export const securityRuleCatalog: Record<DhcpSecurityFindingId, RuleContent> = {
 
 export const readOnlyCommandAllowlist = [
   'ipconfig /all',
-  'ipconfig /renew',
   'Get-DhcpServerv4Scope',
   'Get-DhcpServerv4ScopeStatistics',
   'Get-DhcpServerv4Failover',

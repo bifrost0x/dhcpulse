@@ -168,7 +168,6 @@ describe('diagnoseDhcp', () => {
     ];
     const allowlist = new Set([
       'ipconfig /all',
-      'ipconfig /renew',
       'Get-DhcpServerv4Scope',
       'Get-DhcpServerv4ScopeStatistics',
       'Get-DhcpServerv4Failover',
@@ -180,9 +179,35 @@ describe('diagnoseDhcp', () => {
     for (const scenario of scenarios) {
       const result = diagnoseDhcp(scenario);
       expect(result.commands.every((command) => allowlist.has(command))).toBe(true);
+      expect(result.commands).not.toContain('ipconfig /renew');
       expect(JSON.stringify(result)).not.toMatch(/\b(?:Set|Add|Remove|Restart|Stop|Start)-/i);
     }
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 100.1, 101])(
+    'blocks invalid free-pool percentage %s without inferring exhaustion',
+    (freePoolPercentage) => {
+      const result = diagnose({
+        symptoms: ['wrong-options'],
+        path: 'direct',
+        freePoolPercentage,
+      });
+
+      expect(result.validationFindings).toEqual([
+        expect.objectContaining({
+          id: 'diagnostics-invalid-free-pool-percentage',
+          severity: 'blocker',
+          evidence: [`freePoolPercentage=${String(freePoolPercentage)}`],
+        }),
+      ]);
+      expect(result.rankedCauses.some(({ id }) => id === 'address-pool-exhaustion')).toBe(
+        false,
+      );
+      expect(
+        result.securityFindings.some(({ id }) => id === 'security-starvation-or-exhaustion'),
+      ).toBe(false);
+    },
+  );
 
   it('evaluates every defensive security control from explicit evidence', () => {
     const result = diagnose({
@@ -223,6 +248,9 @@ describe('diagnoseDhcp', () => {
           rationale.length > 0 && evidence.length > 0 && /^(https:\/\/|RFC\s)/.test(source),
       ),
     ).toBe(true);
+    expect(
+      result.securityFindings.find(({ id }) => id === 'security-ra-guard-disabled')?.source,
+    ).toBe('https://www.rfc-editor.org/rfc/rfc7113');
   });
 
   it('uses stable score and ID ordering when causes tie', () => {
@@ -254,5 +282,19 @@ describe('diagnoseDhcp', () => {
         matchedEvidence: expect.arrayContaining(['requestSeen=true;ackSeen=false']),
       }),
     );
+  });
+
+  it('returns weighted contributions that reconstruct every diagnostic score', () => {
+    const result = diagnose();
+
+    for (const cause of result.rankedCauses) {
+      expect(cause.contributions.length).toBeGreaterThan(0);
+      expect(cause.contributions.reduce((sum, { weight }) => sum + weight, 0)).toBe(
+        cause.score,
+      );
+      expect(cause.contributions.map(({ evidence }) => evidence)).toEqual(
+        cause.matchedEvidence,
+      );
+    }
   });
 });

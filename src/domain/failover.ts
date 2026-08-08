@@ -17,34 +17,37 @@ const severityRank: Record<Severity, number> = { blocker: 0, warning: 1, info: 2
 export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFailoverResult {
   const findings: WindowsFailoverFinding[] = [];
   const numericEntries = [
-    ['mcltMinutes', input.mcltMinutes],
-    ['stateSwitchoverMinutes', input.stateSwitchoverMinutes],
-    ['clockSkewSeconds', input.clockSkewSeconds],
-    ['loadBalancePercentage', input.loadBalancePercentage],
-    ['reservePercentage', input.reservePercentage],
-    ['plannedOutageMinutes', input.plannedOutageMinutes],
+    ['mcltMinutes', input.mcltMinutes, isNonNegativeFinite],
+    ['stateSwitchoverMinutes', input.stateSwitchoverMinutes, isNonNegativeFinite],
+    ['clockSkewSeconds', input.clockSkewSeconds, isNonNegativeFinite],
+    ['loadBalancePercentage', input.loadBalancePercentage, isPercentage],
+    ['reservePercentage', input.reservePercentage, isPercentage],
+    ['plannedOutageMinutes', input.plannedOutageMinutes, isNonNegativeFinite],
   ] as const;
-  const nonFiniteEvidence = numericEntries
-    .filter(([, value]) => !Number.isFinite(value))
-    .map(([field]) => `${field}=non-finite`);
-  if (nonFiniteEvidence.length > 0) {
+  const invalidNumericEvidence = numericEntries
+    .filter(([, value, isValid]) => !isValid(value))
+    .map(([field, value]) =>
+      Number.isFinite(value) ? `${field}=${value}` : `${field}=non-finite`,
+    );
+  const numericInputsValid = invalidNumericEvidence.length === 0;
+  if (!numericInputsValid) {
     findings.push(
       finding(
         'failover-invalid-numeric-input',
         'blocker',
-        'Failover timing and percentage inputs must be finite numbers before readiness can be modeled.',
-        nonFiniteEvidence,
+        'Failover timing values must be nonnegative, and percentages must be integers from 0 through 100.',
+        invalidNumericEvidence,
       ),
     );
   }
   const safeInput: WindowsFailoverInput = {
     ...input,
-    mcltMinutes: finiteOrZero(input.mcltMinutes),
-    stateSwitchoverMinutes: finiteOrZero(input.stateSwitchoverMinutes),
-    clockSkewSeconds: finiteOrZero(input.clockSkewSeconds),
-    loadBalancePercentage: finiteOrZero(input.loadBalancePercentage),
-    reservePercentage: finiteOrZero(input.reservePercentage),
-    plannedOutageMinutes: finiteOrZero(input.plannedOutageMinutes),
+    mcltMinutes: nonNegativeOrZero(input.mcltMinutes),
+    stateSwitchoverMinutes: nonNegativeOrZero(input.stateSwitchoverMinutes),
+    clockSkewSeconds: nonNegativeOrZero(input.clockSkewSeconds),
+    loadBalancePercentage: percentageOrZero(input.loadBalancePercentage),
+    reservePercentage: percentageOrZero(input.reservePercentage),
+    plannedOutageMinutes: nonNegativeOrZero(input.plannedOutageMinutes),
   };
 
   if (!input.partnerReachable) {
@@ -77,7 +80,7 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
       ),
     );
   }
-  if (Number.isFinite(input.clockSkewSeconds) && input.clockSkewSeconds > 60) {
+  if (isNonNegativeFinite(input.clockSkewSeconds) && input.clockSkewSeconds > 60) {
     findings.push(
       finding(
         'failover-clock-skew-over-60-seconds',
@@ -118,7 +121,7 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
       ),
     );
   }
-  if (Number.isFinite(input.mcltMinutes) && input.mcltMinutes <= 0) {
+  if (isNonNegativeFinite(input.mcltMinutes) && input.mcltMinutes === 0) {
     findings.push(
       finding(
         'failover-mclt-not-positive',
@@ -129,8 +132,8 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
     );
   }
   if (
-    Number.isFinite(input.stateSwitchoverMinutes) &&
-    Number.isFinite(input.mcltMinutes) &&
+    isNonNegativeFinite(input.stateSwitchoverMinutes) &&
+    isNonNegativeFinite(input.mcltMinutes) &&
     input.stateSwitchoverMinutes < input.mcltMinutes
   ) {
     findings.push(
@@ -142,34 +145,6 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
           `stateSwitchoverMinutes=${input.stateSwitchoverMinutes}`,
           `mcltMinutes=${input.mcltMinutes}`,
         ],
-      ),
-    );
-  }
-  if (
-    input.mode === 'load-balance' &&
-    Number.isFinite(input.loadBalancePercentage) &&
-    (input.loadBalancePercentage <= 0 || input.loadBalancePercentage >= 100)
-  ) {
-    findings.push(
-      finding(
-        'failover-invalid-load-balance-percentage',
-        'warning',
-        'Load balance must allocate a positive share below 100 percent to each partner.',
-        [`loadBalancePercentage=${input.loadBalancePercentage}`],
-      ),
-    );
-  }
-  if (
-    input.mode === 'hot-standby' &&
-    Number.isFinite(input.reservePercentage) &&
-    (input.reservePercentage < 0 || input.reservePercentage > 100)
-  ) {
-    findings.push(
-      finding(
-        'failover-invalid-reserve-percentage',
-        'warning',
-        'Hot-standby reserve must be between 0 and 100 percent.',
-        [`reservePercentage=${input.reservePercentage}`],
       ),
     );
   }
@@ -187,9 +162,9 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
   const safeTransitionMinutes =
     Math.max(0, safeInput.stateSwitchoverMinutes) + Math.max(0, safeInput.mcltMinutes);
   if (
-    Number.isFinite(input.plannedOutageMinutes) &&
-    Number.isFinite(input.stateSwitchoverMinutes) &&
-    Number.isFinite(input.mcltMinutes) &&
+    isNonNegativeFinite(input.plannedOutageMinutes) &&
+    isNonNegativeFinite(input.stateSwitchoverMinutes) &&
+    isNonNegativeFinite(input.mcltMinutes) &&
     input.plannedOutageMinutes > safeTransitionMinutes
   ) {
     findings.push(
@@ -234,9 +209,10 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
         rationale: 'Automatic transition is modeled after the configured state-switchover interval.',
       },
       {
-        state: 'recovery',
+        state: 'mclt-full-pool-eligible',
         afterMinutes: safeTransitionMinutes,
-        rationale: 'MCLT bounds the modeled lease-ownership convergence period.',
+        rationale:
+          'If the partner remains unavailable, this conditional milestone marks state switchover plus MCLT, when full-pool ownership may become eligible; it does not imply recovery.',
       },
     ],
     readiness: findings.some(({ severity }) => severity === 'blocker')
@@ -245,15 +221,22 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
         ? 'caution'
         : 'ready',
     findings,
-    validationChecklist: validationChecklist(safeInput, safeTransitionMinutes),
+    validationChecklist: validationChecklist(
+      safeInput,
+      safeTransitionMinutes,
+      numericInputsValid,
+    ),
   };
 }
 
 function partnerRoles(input: WindowsFailoverInput): FailoverPartnerRoles {
   if (input.mode === 'load-balance') {
+    const primaryState = input.loadBalancePercentage === 0 ? 'inactive' : 'active';
+    const secondaryPercentage = 100 - input.loadBalancePercentage;
+    const secondaryState = secondaryPercentage === 0 ? 'inactive' : 'active';
     return {
-      primary: `active-${input.loadBalancePercentage}-percent`,
-      secondary: `active-${100 - input.loadBalancePercentage}-percent`,
+      primary: `${primaryState}-${input.loadBalancePercentage}-percent`,
+      secondary: `${secondaryState}-${secondaryPercentage}-percent`,
     };
   }
   return {
@@ -265,8 +248,14 @@ function partnerRoles(input: WindowsFailoverInput): FailoverPartnerRoles {
 function validationChecklist(
   input: WindowsFailoverInput,
   safeTransitionMinutes: number,
+  numericInputsValid: boolean,
 ): ValidationChecklistItem[] {
   return [
+    item(
+      'numeric-inputs',
+      numericInputsValid,
+      'Timing values are nonnegative and percentages are integers from 0 through 100.',
+    ),
     item('partner-path', input.partnerReachable, 'Partner replication path is reachable.'),
     item('tcp-647', input.tcp647Allowed, 'TCP 647 is allowed between partners.'),
     item('client-paths', input.clientsReachBothPartners, 'Clients or relays reach both partners.'),
@@ -293,8 +282,20 @@ function item(key: string, passed: boolean, rationale: string): ValidationCheckl
   return { key, passed, rationale };
 }
 
-function finiteOrZero(value: number): number {
-  return Number.isFinite(value) ? value : 0;
+function isNonNegativeFinite(value: number): boolean {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function isPercentage(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 100;
+}
+
+function nonNegativeOrZero(value: number): number {
+  return isNonNegativeFinite(value) ? value : 0;
+}
+
+function percentageOrZero(value: number): number {
+  return isPercentage(value) ? value : 0;
 }
 
 function finding(
