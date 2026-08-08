@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeIpv4Cidr, formatIpv4, parseIpv4, rangeSize, rangesOverlap } from './ip-address';
-import { analyzeScopeDesign } from './scope-design';
+import { analyzeMultiPoolScope, analyzeScopeDesign } from './scope-design';
 import { toolCatalog } from '../content/tool-catalog';
 
 describe('IPv4 addressing helpers', () => {
@@ -197,6 +197,44 @@ describe('analyzeScopeDesign', () => {
       currentlyUsedAddresses: 12,
       remainingAddresses: 0,
     });
+  });
+});
+
+describe('analyzeMultiPoolScope', () => {
+  const base = {
+    id: 'office',
+    cidr: '192.0.2.0/24',
+    pools: [
+      { start: '192.0.2.10', end: '192.0.2.20' },
+      { start: '192.0.2.30', end: '192.0.2.40' },
+    ],
+    leases: 15,
+    dailyGrowth: 0,
+  };
+
+  it('applies current leases once to the aggregate capacity of every pool', () => {
+    const result = analyzeMultiPoolScope(base);
+
+    expect(result.aggregate).toMatchObject({
+      effectiveCapacity: 22,
+      currentlyUsedAddresses: 15,
+      remainingAddresses: 7,
+    });
+    expect(result.findings.filter(({ severity }) => severity === 'blocker')).toEqual([]);
+  });
+
+  it('applies an exclusion only to the pool it intersects', () => {
+    const result = analyzeMultiPoolScope({
+      ...base,
+      exclusions: [{ start: '192.0.2.12', end: '192.0.2.13' }],
+    });
+
+    expect(result.aggregate).toMatchObject({
+      effectiveCapacity: 20,
+      currentlyUsedAddresses: 15,
+      remainingAddresses: 5,
+    });
+    expect(result.findings.map(({ key }) => key).filter((key) => key === 'exclusionOutsidePool')).toEqual([]);
   });
 });
 

@@ -13,6 +13,33 @@ interface NumericRange {
   end: number;
 }
 
+export interface MultiPoolScopeInput {
+  id: string;
+  cidr: string;
+  pools: AddressRangeInput[];
+  exclusions?: AddressRangeInput[];
+  reservations?: ScopeDefinition['reservations'];
+  gateway?: string;
+  leases?: number;
+  dailyGrowth?: number;
+}
+
+export interface MultiPoolScopeAggregate {
+  rawPoolAddresses: number;
+  excludedAddresses: number;
+  effectiveCapacity: number;
+  currentlyUsedAddresses: number;
+  remainingAddresses: number;
+  utilizationPercent: number;
+  exhaustionDays: number | null;
+}
+
+export interface MultiPoolScopeResult {
+  pools: ScopeCapacity[];
+  aggregate: MultiPoolScopeAggregate;
+  findings: ScopeFinding[];
+}
+
 const severityRank = { blocker: 0, warning: 1, info: 2 } as const;
 
 export function analyzeScopeDesign(input: ScopeDesignInput): ScopeDesignResult {
@@ -45,6 +72,87 @@ export function analyzeScopeDesign(input: ScopeDesignInput): ScopeDesignResult {
   );
 
   return { scopes, findings };
+}
+
+export function analyzeMultiPoolScope(input: MultiPoolScopeInput): MultiPoolScopeResult {
+  const findings: ScopeFinding[] = [];
+  const parsedPools = input.pools.map(parseRange);
+  const exclusionsByPool = input.pools.map(() => [] as AddressRangeInput[]);
+
+  for (const exclusion of input.exclusions ?? []) {
+    const range = parseRange(exclusion);
+    if (!range) {
+      findings.push({ key: 'invalidExclusionRange', severity: 'blocker', scopeId: input.id });
+      continue;
+    }
+    const applicable = parsedPools.flatMap((pool, index) => pool && intersection(pool, range) ? [index] : []);
+    if (applicable.length === 0) {
+      findings.push({ key: 'exclusionOutsidePool', severity: 'warning', scopeId: input.id });
+      continue;
+    }
+    for (const index of applicable) exclusionsByPool[index]!.push(exclusion);
+  }
+
+  const definitions: ScopeDefinition[] = input.pools.map((pool, index) => ({
+    id: `${input.id}:pool-${index + 1}`,
+    cidr: input.cidr,
+    pool,
+    exclusions: exclusionsByPool[index],
+    reservations: [],
+    gateway: input.gateway,
+    leases: 0,
+  }));
+  const pools = definitions.map((definition) => analyzeScope(definition, undefined, findings));
+
+  for (let left = 0; left < parsedPools.length; left += 1) {
+    for (let right = left + 1; right < parsedPools.length; right += 1) {
+      const leftPool = parsedPools[left];
+      const rightPool = parsedPools[right];
+      if (leftPool && rightPool && overlaps(leftPool, rightPool)) {
+        addPairFinding(findings, 'overlappingDynamicPools', 'blocker', definitions[left]!.id, definitions[right]!.id);
+      }
+    }
+  }
+
+  if (definitions[0]) {
+    const reservationFindings: ScopeFinding[] = [];
+    analyzeScope({ ...definitions[0], gateway: undefined, exclusions: [], reservations: input.reservations }, undefined, reservationFindings);
+    findings.push(...reservationFindings.filter(({ key }) => key === 'reservationOutsideSubnet' || key === 'duplicateReservationAddress'));
+  }
+
+  const rawPoolAddresses = pools.reduce((sum, pool) => sum + pool.rawPoolAddresses, 0);
+  const excludedAddresses = pools.reduce((sum, pool) => sum + pool.excludedAddresses, 0);
+  const effectiveCapacity = pools.reduce((sum, pool) => sum + pool.effectiveCapacity, 0);
+  const currentlyUsedAddresses = normalizeLeaseCount(input.leases);
+  const remainingAddresses = Math.max(0, effectiveCapacity - currentlyUsedAddresses);
+  const exhaustionDays = calculateExhaustionDays(remainingAddresses, input.dailyGrowth);
+  if (currentlyUsedAddresses > effectiveCapacity) {
+    findings.push({ key: 'overCapacityCurrentLeases', severity: 'blocker', scopeId: input.id });
+  }
+  if (exhaustionDays !== null && exhaustionDays <= 30) {
+    findings.push({ key: 'exhaustionWithin30Days', severity: 'warning', scopeId: input.id });
+  }
+
+  findings.sort(
+    (left, right) =>
+      severityRank[left.severity] - severityRank[right.severity] ||
+      compareText(left.key, right.key) ||
+      compareText(left.scopeId, right.scopeId),
+  );
+
+  return {
+    pools,
+    aggregate: {
+      rawPoolAddresses,
+      excludedAddresses,
+      effectiveCapacity,
+      currentlyUsedAddresses,
+      remainingAddresses,
+      utilizationPercent: effectiveCapacity === 0 ? 0 : (currentlyUsedAddresses / effectiveCapacity) * 100,
+      exhaustionDays,
+    },
+    findings,
+  };
 }
 
 function analyzeScope(
