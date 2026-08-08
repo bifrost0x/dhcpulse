@@ -1,0 +1,316 @@
+import type {
+  FailoverPartnerRoles,
+  Severity,
+  ValidationChecklistItem,
+  WindowsFailoverFinding,
+  WindowsFailoverFindingId,
+  WindowsFailoverInput,
+  WindowsFailoverResult,
+} from './types';
+
+const MICROSOFT_FAILOVER_SOURCE =
+  'https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-failover';
+const MICROSOFT_FAILOVER_DEPLOYMENT_SOURCE =
+  'https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/manage-dhcp-failover-relationships';
+const severityRank: Record<Severity, number> = { blocker: 0, warning: 1, info: 2 };
+
+export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFailoverResult {
+  const findings: WindowsFailoverFinding[] = [];
+  const numericEntries = [
+    ['mcltMinutes', input.mcltMinutes],
+    ['stateSwitchoverMinutes', input.stateSwitchoverMinutes],
+    ['clockSkewSeconds', input.clockSkewSeconds],
+    ['loadBalancePercentage', input.loadBalancePercentage],
+    ['reservePercentage', input.reservePercentage],
+    ['plannedOutageMinutes', input.plannedOutageMinutes],
+  ] as const;
+  const nonFiniteEvidence = numericEntries
+    .filter(([, value]) => !Number.isFinite(value))
+    .map(([field]) => `${field}=non-finite`);
+  if (nonFiniteEvidence.length > 0) {
+    findings.push(
+      finding(
+        'failover-invalid-numeric-input',
+        'blocker',
+        'Failover timing and percentage inputs must be finite numbers before readiness can be modeled.',
+        nonFiniteEvidence,
+      ),
+    );
+  }
+  const safeInput: WindowsFailoverInput = {
+    ...input,
+    mcltMinutes: finiteOrZero(input.mcltMinutes),
+    stateSwitchoverMinutes: finiteOrZero(input.stateSwitchoverMinutes),
+    clockSkewSeconds: finiteOrZero(input.clockSkewSeconds),
+    loadBalancePercentage: finiteOrZero(input.loadBalancePercentage),
+    reservePercentage: finiteOrZero(input.reservePercentage),
+    plannedOutageMinutes: finiteOrZero(input.plannedOutageMinutes),
+  };
+
+  if (!input.partnerReachable) {
+    findings.push(
+      finding(
+        'failover-partner-unreachable',
+        'blocker',
+        'The failover partners need a working replication path before the relationship is ready.',
+        ['partnerReachable=false'],
+      ),
+    );
+  }
+  if (!input.tcp647Allowed) {
+    findings.push(
+      finding(
+        'failover-tcp-647-blocked',
+        'blocker',
+        'Windows DHCP failover partners exchange state over TCP 647.',
+        ['tcp647Allowed=false'],
+      ),
+    );
+  }
+  if (!input.clientsReachBothPartners) {
+    findings.push(
+      finding(
+        'failover-client-reachability-missing',
+        'blocker',
+        'Clients or relays must be able to reach both partners for service continuity.',
+        ['clientsReachBothPartners=false'],
+      ),
+    );
+  }
+  if (Number.isFinite(input.clockSkewSeconds) && input.clockSkewSeconds > 60) {
+    findings.push(
+      finding(
+        'failover-clock-skew-over-60-seconds',
+        'blocker',
+        'Clock skew above 60 seconds can invalidate failover timing assumptions.',
+        [`clockSkewSeconds=${input.clockSkewSeconds}`],
+      ),
+    );
+  }
+  if (input.scopeProtocol === 'dhcpv6') {
+    findings.push(
+      finding(
+        'windows-failover-dhcpv6-unsupported',
+        'blocker',
+        'Windows DHCP failover applies to DHCPv4 scopes and cannot protect this DHCPv6 scope.',
+        ['scopeProtocol=dhcpv6'],
+      ),
+    );
+  }
+
+  if (!input.sameDnsUpdateCredentials) {
+    findings.push(
+      finding(
+        'failover-dns-credentials-mismatch',
+        'warning',
+        'Both partners should use the same DNS update credentials to keep registrations consistent.',
+        ['sameDnsUpdateCredentials=false'],
+      ),
+    );
+  }
+  if (!input.configurationReplicated) {
+    findings.push(
+      finding(
+        'failover-configuration-not-replicated',
+        'warning',
+        'Failover does not make every scope setting identical; stale configuration must be reconciled.',
+        ['configurationReplicated=false'],
+      ),
+    );
+  }
+  if (Number.isFinite(input.mcltMinutes) && input.mcltMinutes <= 0) {
+    findings.push(
+      finding(
+        'failover-mclt-not-positive',
+        'warning',
+        'MCLT must be positive to model lease ownership safely.',
+        [`mcltMinutes=${input.mcltMinutes}`],
+      ),
+    );
+  }
+  if (
+    Number.isFinite(input.stateSwitchoverMinutes) &&
+    Number.isFinite(input.mcltMinutes) &&
+    input.stateSwitchoverMinutes < input.mcltMinutes
+  ) {
+    findings.push(
+      finding(
+        'failover-state-switchover-below-mclt',
+        'warning',
+        'The automatic state-switchover interval should not undercut the MCLT transition period.',
+        [
+          `stateSwitchoverMinutes=${input.stateSwitchoverMinutes}`,
+          `mcltMinutes=${input.mcltMinutes}`,
+        ],
+      ),
+    );
+  }
+  if (
+    input.mode === 'load-balance' &&
+    Number.isFinite(input.loadBalancePercentage) &&
+    (input.loadBalancePercentage <= 0 || input.loadBalancePercentage >= 100)
+  ) {
+    findings.push(
+      finding(
+        'failover-invalid-load-balance-percentage',
+        'warning',
+        'Load balance must allocate a positive share below 100 percent to each partner.',
+        [`loadBalancePercentage=${input.loadBalancePercentage}`],
+      ),
+    );
+  }
+  if (
+    input.mode === 'hot-standby' &&
+    Number.isFinite(input.reservePercentage) &&
+    (input.reservePercentage < 0 || input.reservePercentage > 100)
+  ) {
+    findings.push(
+      finding(
+        'failover-invalid-reserve-percentage',
+        'warning',
+        'Hot-standby reserve must be between 0 and 100 percent.',
+        [`reservePercentage=${input.reservePercentage}`],
+      ),
+    );
+  }
+  if (input.duplicateRelayForwarding) {
+    findings.push(
+      finding(
+        'failover-duplicate-relay-forwarding',
+        'warning',
+        'Duplicate relay forwarding can cause redundant requests and obscure the intended server path.',
+        ['duplicateRelayForwarding=true'],
+      ),
+    );
+  }
+
+  const safeTransitionMinutes =
+    Math.max(0, safeInput.stateSwitchoverMinutes) + Math.max(0, safeInput.mcltMinutes);
+  if (
+    Number.isFinite(input.plannedOutageMinutes) &&
+    Number.isFinite(input.stateSwitchoverMinutes) &&
+    Number.isFinite(input.mcltMinutes) &&
+    input.plannedOutageMinutes > safeTransitionMinutes
+  ) {
+    findings.push(
+      finding(
+        'failover-outage-exceeds-safe-window',
+        'warning',
+        'The planned outage exceeds the modeled state-switchover plus MCLT transition window.',
+        [
+          `plannedOutageMinutes=${input.plannedOutageMinutes}`,
+          `safeTransitionMinutes=${safeTransitionMinutes}`,
+        ],
+      ),
+    );
+  }
+
+  findings.push(
+    finding(
+      'windows-failover-ipv4-only',
+      'info',
+      'Windows DHCP failover protects DHCPv4 scopes only; DHCPv6 needs a separate availability design.',
+      [`scopeProtocol=${input.scopeProtocol}`],
+    ),
+  );
+  findings.sort(
+    (left, right) =>
+      severityRank[left.severity] - severityRank[right.severity] ||
+      left.id.localeCompare(right.id),
+  );
+
+  return {
+    partnerRoles: partnerRoles(safeInput),
+    timeline: [
+      { state: 'normal', afterMinutes: 0, rationale: 'Both partners serve their configured roles.' },
+      {
+        state: 'communication-interrupted',
+        afterMinutes: 0,
+        rationale: 'A lost partner path starts the communication-interrupted state.',
+      },
+      {
+        state: 'partner-down',
+        afterMinutes: Math.max(0, safeInput.stateSwitchoverMinutes),
+        rationale: 'Automatic transition is modeled after the configured state-switchover interval.',
+      },
+      {
+        state: 'recovery',
+        afterMinutes: safeTransitionMinutes,
+        rationale: 'MCLT bounds the modeled lease-ownership convergence period.',
+      },
+    ],
+    readiness: findings.some(({ severity }) => severity === 'blocker')
+      ? 'no-go'
+      : findings.some(({ severity }) => severity === 'warning')
+        ? 'caution'
+        : 'ready',
+    findings,
+    validationChecklist: validationChecklist(safeInput, safeTransitionMinutes),
+  };
+}
+
+function partnerRoles(input: WindowsFailoverInput): FailoverPartnerRoles {
+  if (input.mode === 'load-balance') {
+    return {
+      primary: `active-${input.loadBalancePercentage}-percent`,
+      secondary: `active-${100 - input.loadBalancePercentage}-percent`,
+    };
+  }
+  return {
+    primary: 'active',
+    secondary: `standby-reserve-${input.reservePercentage}-percent`,
+  };
+}
+
+function validationChecklist(
+  input: WindowsFailoverInput,
+  safeTransitionMinutes: number,
+): ValidationChecklistItem[] {
+  return [
+    item('partner-path', input.partnerReachable, 'Partner replication path is reachable.'),
+    item('tcp-647', input.tcp647Allowed, 'TCP 647 is allowed between partners.'),
+    item('client-paths', input.clientsReachBothPartners, 'Clients or relays reach both partners.'),
+    item('clock-skew', input.clockSkewSeconds <= 60, 'Clock skew is at most 60 seconds.'),
+    item('dns-credentials', input.sameDnsUpdateCredentials, 'DNS update credentials match.'),
+    item('configuration', input.configurationReplicated, 'Scope configuration is replicated.'),
+    item('relay-forwarding', !input.duplicateRelayForwarding, 'Relay forwarding is not duplicated.'),
+    item('mclt', input.mcltMinutes > 0, 'MCLT is positive.'),
+    item(
+      'state-switchover',
+      input.stateSwitchoverMinutes >= input.mcltMinutes,
+      'State switchover is not below MCLT.',
+    ),
+    item(
+      'planned-outage',
+      input.plannedOutageMinutes <= safeTransitionMinutes,
+      'Planned outage stays within the modeled safe transition window.',
+    ),
+    item('dhcpv4-scope', input.scopeProtocol === 'dhcpv4', 'Scope uses DHCPv4.'),
+  ];
+}
+
+function item(key: string, passed: boolean, rationale: string): ValidationChecklistItem {
+  return { key, passed, rationale };
+}
+
+function finiteOrZero(value: number): number {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function finding(
+  id: WindowsFailoverFindingId,
+  severity: Severity,
+  rationale: string,
+  evidence: string[],
+): WindowsFailoverFinding {
+  return {
+    id,
+    severity,
+    rationale,
+    evidence,
+    source:
+      id === 'failover-tcp-647-blocked'
+        ? MICROSOFT_FAILOVER_DEPLOYMENT_SOURCE
+        : MICROSOFT_FAILOVER_SOURCE,
+  };
+}
