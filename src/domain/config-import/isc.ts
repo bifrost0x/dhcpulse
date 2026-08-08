@@ -10,12 +10,17 @@ import {
 import {
   addWarning,
   assignReservationsToScopes,
+  ConfigImportError,
   maskToPrefix,
+  MAX_STRUCTURE_DEPTH,
+  MAX_STRUCTURE_NODES,
   numeric,
+  normalizeReservationIdentifier,
   optionCode,
   optional,
   optionalNumber,
   provenance,
+  reservationConfigId,
 } from './shared';
 
 interface IscToken {
@@ -38,7 +43,14 @@ type IscNode = IscStatement | IscBlock;
 
 export function importIscDhcpd(text: string, fileName?: string): DhcpConfiguration {
   const configuration = emptyDhcpConfiguration('isc-dhcpd', 'ISC DHCP', fileName);
-  const nodes = parseNodes(tokenize(text)).nodes;
+  const tokens = tokenize(text);
+  if (tokens.length > MAX_STRUCTURE_NODES * 2) {
+    throw new ConfigImportError(
+      'STRUCTURE_TOO_COMPLEX',
+      'ISC dhcpd configuration exceeds the supported token complexity limit.',
+    );
+  }
+  const nodes = parseNodes(tokens).nodes;
   const globalLease = findNumericStatement(nodes, 'default-lease-time');
   const maxLease = findNumericStatement(nodes, 'max-lease-time');
   configuration.servers.push({
@@ -96,9 +108,10 @@ function walk(configuration: DhcpConfiguration, nodes: IscNode[], context: Conte
         const range = node.children
           .filter((child): child is IscStatement => child.kind === 'statement')
           .map((child) => values(child.tokens))
-          .find((statement) => statement[0]?.toLowerCase() === 'range' && statement[1] && statement[2]);
-        const poolId = range?.[1] && range[2]
-          ? deterministicConfigId('pool', context.scope?.cidr, range[1], range[2])
+          .map(parseRangeStatement)
+          .find((candidate) => candidate !== undefined);
+        const poolId = range
+          ? deterministicConfigId('pool', context.scope?.cidr, range.start, range.end)
           : undefined;
         walk(configuration, node.children, { ...context, level: 'pool', ...(poolId ? { poolId } : {}) });
       } else if (keyword === 'host' && header[1]) {
@@ -124,14 +137,15 @@ function walk(configuration: DhcpConfiguration, nodes: IscNode[], context: Conte
 
     const statement = values(node.tokens);
     const keyword = statement[0]?.toLowerCase();
-    if (keyword === 'range' && statement[1] && statement[2]) {
+    const range = keyword === 'range' ? parseRangeStatement(statement) : undefined;
+    if (range) {
       configuration.pools.push({
-        id: deterministicConfigId('pool', context.scope?.cidr, statement[1], statement[2]),
+        id: deterministicConfigId('pool', context.scope?.cidr, range.start, range.end),
         provenance: provenance('isc-dhcpd', tokenLocation(node.tokens[0])),
         protocol: 'dhcpv4',
         ...(context.scope ? { scopeId: context.scope.id } : {}),
-        start: statement[1],
-        end: statement[2],
+        start: range.start,
+        end: range.end,
         ...optionalNumber('leaseLifetimeSeconds', context.scope?.leaseLifetimeSeconds ?? context.globalLease),
       });
     } else if (keyword === 'option' && statement[1]) {
@@ -178,18 +192,28 @@ function importHost(configuration: DhcpConfiguration, block: IscBlock, name: str
     return;
   }
   const hardware = statementValues(block.children, ['hardware', 'ethernet'])[0];
+  const normalizedIdentifier = normalizeReservationIdentifier(hardware ?? name, hardware ? 'mac' : 'hostname');
   const reservation: DhcpReservation = {
-    id: deterministicConfigId('reservation', 'dhcpv4', hardware, name, fixedAddress),
+    id: reservationConfigId('dhcpv4', normalizedIdentifier.identifier, normalizedIdentifier.identifierType, name, fixedAddress),
     provenance: provenance('isc-dhcpd', tokenLocation(block.header[0])),
     protocol: 'dhcpv4',
     ...(context.scope ? { scopeId: context.scope.id } : {}),
     address: fixedAddress,
-    ...(hardware ? { identifier: hardware, identifierType: 'mac' } : { identifier: name, identifierType: 'hostname' }),
+    ...(normalizedIdentifier.identifier ? { identifier: normalizedIdentifier.identifier } : {}),
+    ...(normalizedIdentifier.identifierType ? { identifierType: normalizedIdentifier.identifierType } : {}),
     hostname: name,
     level: context.scope ? 'scope' : 'global',
   };
   configuration.reservations.push(reservation);
   walk(configuration, block.children, { ...context, reservationId: reservation.id, level: 'reservation' });
+}
+
+function parseRangeStatement(statement: string[]): { start: string; end: string } | undefined {
+  if (statement[0]?.toLowerCase() !== 'range') return undefined;
+  const addresses = statement.slice(statement[1]?.toLowerCase() === 'dynamic-bootp' ? 2 : 1);
+  const start = addresses[0];
+  if (!start) return undefined;
+  return { start, end: addresses[1] ?? start };
 }
 
 function addOption(configuration: DhcpConfiguration, name: string, value: string, token: IscToken | undefined, context: Context): void {
@@ -280,7 +304,13 @@ function tokenize(text: string): IscToken[] {
   return tokens;
 }
 
-function parseNodes(tokens: IscToken[], start = 0): { nodes: IscNode[]; index: number } {
+function parseNodes(tokens: IscToken[], start = 0, depth = 0): { nodes: IscNode[]; index: number } {
+  if (depth > MAX_STRUCTURE_DEPTH) {
+    throw new ConfigImportError(
+      'STRUCTURE_TOO_COMPLEX',
+      'ISC dhcpd configuration exceeds the supported nesting-depth limit.',
+    );
+  }
   const nodes: IscNode[] = [];
   let index = start;
   while (index < tokens.length) {
@@ -293,7 +323,7 @@ function parseNodes(tokens: IscToken[], start = 0): { nodes: IscNode[]; index: n
     }
     const delimiter = tokens[index]?.value;
     if (delimiter === '{') {
-      const child = parseNodes(tokens, index + 1);
+      const child = parseNodes(tokens, index + 1, depth + 1);
       nodes.push({ kind: 'block', header, children: child.nodes });
       index = child.index;
     } else if (delimiter === ';') {

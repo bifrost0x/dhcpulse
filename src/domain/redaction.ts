@@ -2,6 +2,7 @@ import type { DhcpConfiguration, DhcpOption } from './config-model';
 
 export interface Redactor {
   redactHostname(value: string): string;
+  redactLabel(value: string): string;
   redactMac(value: string): string;
   redactIdentifier(value: string): string;
   redactIpv4(value: string): string;
@@ -18,6 +19,7 @@ export interface AssessmentExportOptions {
 export function createRedactor(seed = 'dhcpulse'): Redactor {
   const caches = {
     hostname: new Map<string, string>(),
+    label: new Map<string, string>(),
     mac: new Map<string, string>(),
     identifier: new Map<string, string>(),
     ipv4: new Map<string, string>(),
@@ -40,6 +42,8 @@ export function createRedactor(seed = 'dhcpulse'): Redactor {
     const labels = Array.from({ length: labelCount }, (_, index) => `host-${hash.slice(index * 4, index * 4 + 4)}`);
     return `${labels.join('.')}.example.com`;
   });
+
+  const redactLabel = (value: string): string => cached('label', value, () => `label-${digest('label', value).slice(0, 12)}`);
 
   const redactMac = (value: string): string => cached('mac', value, () => {
     const hash = digest('mac', value).padEnd(10, '0');
@@ -76,7 +80,7 @@ export function createRedactor(seed = 'dhcpulse'): Redactor {
     return output;
   };
 
-  return { redactHostname, redactMac, redactIdentifier, redactIpv4, redactIpv6, redactText };
+  return { redactHostname, redactLabel, redactMac, redactIdentifier, redactIpv4, redactIpv6, redactText };
 }
 
 export function redactConfiguration(configuration: DhcpConfiguration, seed = 'dhcpulse'): DhcpConfiguration {
@@ -92,11 +96,13 @@ export function redactConfiguration(configuration: DhcpConfiguration, seed = 'dh
   }
   for (const scope of [...copy.ipv4Scopes, ...copy.ipv6Scopes]) {
     scope.cidr = scope.protocol === 'dhcpv4' ? redactor.redactIpv4(scope.cidr) : redactor.redactIpv6(scope.cidr);
-    if (scope.name) scope.name = redactor.redactText(scope.name);
+    if (scope.name) scope.name = redactor.redactLabel(scope.name);
+    if (scope.sharedNetwork) scope.sharedNetwork = redactor.redactLabel(scope.sharedNetwork);
   }
   for (const pool of copy.pools) {
     pool.start = redactAddress(pool.start, redactor);
     pool.end = pool.end.startsWith('constructor:') ? pool.end : redactAddress(pool.end, redactor);
+    if (pool.tags) pool.tags = pool.tags.map(redactor.redactLabel);
   }
   for (const exclusion of copy.exclusions) {
     exclusion.start = redactAddress(exclusion.start, redactor);
@@ -110,19 +116,24 @@ export function redactConfiguration(configuration: DhcpConfiguration, seed = 'dh
         : redactor.redactIdentifier(reservation.identifier);
     }
     if (reservation.hostname) reservation.hostname = redactor.redactHostname(reservation.hostname);
+    if (reservation.tags) reservation.tags = reservation.tags.map(redactor.redactLabel);
   }
-  for (const option of copy.options) option.value = redactOptionValue(option, redactor);
+  for (const option of copy.options) {
+    option.value = redactOptionValue(option, redactor);
+    if (option.tags) option.tags = option.tags.map(redactor.redactLabel);
+  }
   for (const item of [...copy.policies, ...copy.classes]) {
-    item.name = redactor.redactText(item.name);
-    if (item.expression) item.expression = redactor.redactText(item.expression);
+    item.name = redactor.redactLabel(item.name);
+    if (item.expression) item.expression = redactTopologyText(item.expression, configuration, redactor);
   }
   for (const relay of copy.relayAddresses) {
     relay.address = redactAddress(relay.address, redactor);
     if (relay.serverAddress) relay.serverAddress = redactAddress(relay.serverAddress, redactor);
+    if (relay.interfaceName) relay.interfaceName = redactor.redactLabel(relay.interfaceName);
   }
   for (const relationship of copy.failoverRelationships) {
-    relationship.name = redactor.redactText(relationship.name);
-    if (relationship.partner) relationship.partner = redactor.redactText(relationship.partner);
+    relationship.name = redactor.redactLabel(relationship.name);
+    if (relationship.partner) relationship.partner = redactHostOrAddress(relationship.partner, redactor);
   }
   for (const settings of copy.dnsUpdateSettings) {
     if (settings.domain) settings.domain = redactor.redactHostname(settings.domain);
@@ -202,6 +213,11 @@ function sensitiveReplacements(configuration: DhcpConfiguration, redactor: Redac
   }
   for (const scope of [...configuration.ipv4Scopes, ...configuration.ipv6Scopes]) {
     add(scope.cidr, scope.protocol === 'dhcpv4' ? redactor.redactIpv4(scope.cidr) : redactor.redactIpv6(scope.cidr));
+    add(scope.name, scope.name ? redactor.redactLabel(scope.name) : undefined);
+    add(scope.sharedNetwork, scope.sharedNetwork ? redactor.redactLabel(scope.sharedNetwork) : undefined);
+  }
+  for (const pool of configuration.pools) {
+    for (const tag of pool.tags ?? []) add(tag, redactor.redactLabel(tag));
   }
   for (const reservation of configuration.reservations) {
     add(reservation.address, redactAddress(reservation.address, redactor));
@@ -214,20 +230,36 @@ function sensitiveReplacements(configuration: DhcpConfiguration, redactor: Redac
           : redactor.redactIdentifier(reservation.identifier)
         : undefined,
     );
+    for (const tag of reservation.tags ?? []) add(tag, redactor.redactLabel(tag));
   }
   for (const relay of configuration.relayAddresses) {
     add(relay.address, redactAddress(relay.address, redactor));
     add(relay.serverAddress, relay.serverAddress ? redactAddress(relay.serverAddress, redactor) : undefined);
+    add(relay.interfaceName, relay.interfaceName ? redactor.redactLabel(relay.interfaceName) : undefined);
   }
   for (const relationship of configuration.failoverRelationships) {
-    add(relationship.partner, relationship.partner ? redactor.redactText(relationship.partner) : undefined);
+    add(relationship.name, redactor.redactLabel(relationship.name));
+    add(relationship.partner, relationship.partner ? redactHostOrAddress(relationship.partner, redactor) : undefined);
   }
   for (const option of configuration.options) {
+    for (const tag of option.tags ?? []) add(tag, redactor.redactLabel(tag));
     if (!isClientIdentifierOption(option)) continue;
     const values = Array.isArray(option.value) ? option.value : typeof option.value === 'string' ? [option.value] : [];
     for (const value of values) add(value, redactor.redactIdentifier(value));
   }
+  for (const item of [...configuration.policies, ...configuration.classes]) {
+    add(item.name, redactor.redactLabel(item.name));
+  }
   return replacements.sort((left, right) => right.original.length - left.original.length);
+}
+
+function redactTopologyText(value: string, configuration: DhcpConfiguration, redactor: Redactor): string {
+  const replacements = sensitiveReplacements(configuration, redactor);
+  const replaced = replacements.reduce(
+    (text, replacement) => text.replace(new RegExp(escapeRegExp(replacement.original), 'gi'), replacement.redacted),
+    value,
+  );
+  return redactor.redactText(replaced);
 }
 
 function redactOptionValue(option: DhcpOption, redactor: Redactor): DhcpOption['value'] {
@@ -246,6 +278,12 @@ function isClientIdentifierOption(option: DhcpOption): boolean {
 
 function redactAddress(value: string, redactor: Redactor): string {
   return value.includes(':') ? redactor.redactIpv6(value) : redactor.redactIpv4(value);
+}
+
+function redactHostOrAddress(value: string, redactor: Redactor): string {
+  if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(value)) return redactor.redactIpv4(value);
+  if (value.includes(':')) return redactor.redactIpv6(value);
+  return redactor.redactHostname(value);
 }
 
 function redactFileName(value: string): string {

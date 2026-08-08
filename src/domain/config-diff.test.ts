@@ -104,6 +104,61 @@ describe('compareDhcpConfigurations', () => {
 
     expect(result.changes).toContainEqual(expect.objectContaining({ entityType: 'duplicate-identifier' }));
   });
+
+  it('redacts opaque DHCP client identifiers in option changes', () => {
+    const before = sourceConfiguration();
+    const after = structuredClone(before);
+    before.options = [{
+      id: 'client-id-option',
+      provenance: { format: 'microsoft-xml', location: '/before' },
+      protocol: 'dhcpv4',
+      code: 61,
+      name: 'client-identifier',
+      value: 'opaque-client-before',
+      level: 'global',
+    }];
+    after.options = [{ ...before.options[0]!, provenance: { format: 'microsoft-xml', location: '/after' }, value: 'opaque-client-after' }];
+
+    const serialized = JSON.stringify(compareDhcpConfigurations(before, after));
+
+    expect(serialized).not.toContain('opaque-client-before');
+    expect(serialized).not.toContain('opaque-client-after');
+    expect(serialized).toMatch(/duid-[0-9a-f]{12}/);
+  });
+
+  it('uses source observed leases when a target scope exists without observations', () => {
+    const before = sourceConfiguration();
+    const after = structuredClone(before);
+    before.ipv4Scopes[0]!.observedLeaseCount = 30;
+    after.ipv4Scopes[0]!.observedLeaseCount = undefined;
+    after.pools[0]!.end = '192.0.2.40';
+
+    const poolChange = compareDhcpConfigurations(before, after).changes.find(({ entityType }) => entityType === 'pool');
+
+    expect(poolChange).toMatchObject({ impact: 'blocker' });
+    expect(poolChange?.explanation).toMatch(/observed lease count/i);
+  });
+
+  it('compares large reversed duplicate-key groups within a bounded time', () => {
+    const before = sourceConfiguration();
+    const after = structuredClone(before);
+    const options = Array.from({ length: 2_500 }, (_, index) => ({
+      id: `option-${index}`,
+      provenance: { format: 'kea-json' as const, location: `$.options[${index}]` },
+      protocol: 'dhcpv4' as const,
+      code: 222,
+      value: `documentation-value-${index}`,
+      level: 'global' as const,
+    }));
+    before.options = options;
+    after.options = [...options].reverse().map((option) => ({ ...option }));
+    const started = performance.now();
+
+    const result = compareDhcpConfigurations(before, after);
+
+    expect(result.changes).toEqual([]);
+    expect(performance.now() - started).toBeLessThan(1_500);
+  }, 5_000);
 });
 
 function sourceConfiguration(): DhcpConfiguration {

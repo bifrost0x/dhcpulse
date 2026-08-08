@@ -12,10 +12,12 @@ import {
   durationSeconds,
   maskToPrefix,
   numberOr,
+  normalizeReservationIdentifier,
   numeric,
   optional,
   optionalNumber,
   provenance,
+  reservationConfigId,
   valueKey,
 } from './shared';
 
@@ -29,6 +31,9 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   }
   const format = 'microsoft-xml' as const;
   const root = document.documentElement;
+  if (!['dhcpserverexport', 'dhcpserver'].includes(localName(root))) {
+    throw new ConfigImportError('UNKNOWN_FORMAT', 'XML root is not a supported Microsoft DHCP export root.');
+  }
   const configuration = emptyDhcpConfiguration(format, 'Microsoft DHCP Server', fileName);
   configuration.metadata.version = attribute(root, 'version') ?? firstText(root, ['version']);
 
@@ -108,15 +113,16 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   for (const element of elements(root, ['reservation'])) {
     const address = firstText(element, ['ipaddress', 'reservedip', 'address']);
     if (!address) continue;
-    const identifier = firstText(element, ['clientid', 'duid', 'macaddress']);
+    const rawIdentifier = firstText(element, ['clientid', 'duid', 'macaddress']);
     const hostname = firstText(element, ['name', 'hostname']);
     const scope = nearestScope(element, scopeByElement);
     const protocol = address.includes(':') ? 'dhcpv6' : 'dhcpv4';
-    const identifierType: ReservationIdentifierType | undefined = identifier
+    const hintedIdentifierType: ReservationIdentifierType | undefined = rawIdentifier
       ? protocol === 'dhcpv6' ? 'duid' : 'client-id'
       : hostname ? 'hostname' : undefined;
+    const { identifier, identifierType } = normalizeReservationIdentifier(rawIdentifier, hintedIdentifierType);
     configuration.reservations.push({
-      id: deterministicConfigId('reservation', protocol, identifier, hostname, address),
+      id: reservationConfigId(protocol, identifier, identifierType, hostname, address),
       provenance: provenance(format, xmlPath(element)),
       protocol,
       ...(scope ? { scopeId: scope.id } : {}),

@@ -10,14 +10,17 @@ import {
 import {
   addWarning,
   array,
+  assertStructureBounds,
   booleanFromUnknown,
   ConfigImportError,
   numberValue,
+  normalizeReservationIdentifier,
   optional,
   optionalBoolean,
   optionalNumber,
   primitiveOptionValue,
   provenance,
+  reservationConfigId,
   record,
   stringArray,
   stringValue,
@@ -31,6 +34,7 @@ export function importKeaJson(text: string, fileName?: string): DhcpConfiguratio
   } catch {
     throw new ConfigImportError('MALFORMED_JSON', 'Kea JSON is malformed after supported comments are removed.');
   }
+  assertStructureBounds(parsed);
   const root = record(parsed);
   if (!root) throw new ConfigImportError('MALFORMED_JSON', 'Kea JSON root must be an object.');
   const configuration = emptyDhcpConfiguration('kea-json', 'ISC Kea', fileName);
@@ -132,7 +136,7 @@ function importSubnet(
     const pool = record(poolValue);
     const range = pool ? stringValue(pool.pool) : undefined;
     if (!range) return;
-    const rangeParts = range.split(/\s+-\s+/, 2);
+    const rangeParts = range.split(/\s*-\s*/, 2);
     const start = rangeParts[0];
     if (!start) return;
     const end = rangeParts[1] ?? start;
@@ -218,11 +222,12 @@ function importReservations(
       ['hostname', stringValue(reservation.hostname)],
     ];
     const selected = identifiers.find(([, identifier]) => identifier);
-    const identifierType = selected?.[0];
-    const identifier = selected?.[1];
+    const normalizedIdentifier = normalizeReservationIdentifier(selected?.[1], selected?.[0]);
+    const identifierType = normalizedIdentifier.identifierType;
+    const identifier = normalizedIdentifier.identifier;
     const hostname = stringValue(reservation.hostname);
     const normalized: DhcpReservation = {
-      id: deterministicConfigId('reservation', protocol, identifier, hostname, address),
+      id: reservationConfigId(protocol, identifier, identifierType, hostname, address),
       provenance: provenance('kea-json', `${path}[${index}]`),
       protocol,
       ...(scope ? { scopeId: scope.id } : {}),

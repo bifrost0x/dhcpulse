@@ -76,7 +76,7 @@ describe('importDhcpConfiguration', () => {
 
     expect(dnsmasqConfig.servers[0]?.authoritative).toBe(true);
     expect(dnsmasqConfig.relayAddresses[0]).toMatchObject({ address: '203.0.113.1', serverAddress: '203.0.113.2' });
-    expect(dnsmasqConfig.ipv6Scopes[0]?.cidr).toBe('2001:db8:30::100/64');
+    expect(dnsmasqConfig.ipv6Scopes[0]?.cidr).toBe('2001:db8:30::/64');
     expect(dnsmasqConfig.policies.some(({ name }) => name === 'docs')).toBe(true);
   });
 
@@ -159,6 +159,72 @@ describe('importDhcpConfiguration', () => {
     expect(warnings).toContainEqual(expect.objectContaining({ code: 'unsupported-directive' }));
   });
 
+  it('normalizes the same MAC reservation identity across Microsoft, Kea, ISC, and dnsmasq', () => {
+    const microsoft = `<DhcpServerExport><IPv4><Scopes><Scope><ScopeId>192.0.2.0</ScopeId><SubnetMask>255.255.255.0</SubnetMask><Reservations><Reservation><IPAddress>192.0.2.50</IPAddress><ClientId>02-00-5E-10-00-AA</ClientId><Name>ms-host</Name></Reservation></Reservations></Scope></Scopes></IPv4></DhcpServerExport>`;
+    const keaMac = `{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24","reservations":[{"hw-address":"02:00:5e:10:00:aa","ip-address":"192.0.2.50","hostname":"kea-host"}]}]}}`;
+    const iscMac = `subnet 192.0.2.0 netmask 255.255.255.0 { host isc-host { hardware ethernet 02:00:5E:10:00:AA; fixed-address 192.0.2.50; } }`;
+    const dnsmasqMac = `dhcp-range=192.0.2.10,192.0.2.20,255.255.255.0\ndhcp-host=02-00-5e-10-00-aa,dnsmasq-host,192.0.2.50`;
+    const configurations = [
+      importDhcpConfiguration({ text: microsoft, format: 'microsoft-xml' }).configuration,
+      importDhcpConfiguration({ text: keaMac, format: 'kea-json' }).configuration,
+      importDhcpConfiguration({ text: iscMac, format: 'isc-dhcpd' }).configuration,
+      importDhcpConfiguration({ text: dnsmasqMac, format: 'dnsmasq' }).configuration,
+    ];
+    const reservations = configurations.map((configuration) => configuration.reservations[0]!);
+
+    expect(reservations.map(({ identifier }) => identifier)).toEqual(Array(4).fill('02:00:5e:10:00:aa'));
+    expect(reservations.map(({ identifierType }) => identifierType)).toEqual(Array(4).fill('mac'));
+    expect(new Set(reservations.map(({ id }) => id)).size).toBe(1);
+  });
+
+  it.each([
+    '192.0.2.10-192.0.2.20',
+    '192.0.2.10 -192.0.2.20',
+    '192.0.2.10- 192.0.2.20',
+  ])('accepts Kea pool ranges with optional whitespace: %s', (pool) => {
+    const text = `{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24","pools":[{"pool":"${pool}"}]}]}}`;
+
+    const imported = importDhcpConfiguration({ text, format: 'kea-json' }).configuration.pools[0];
+
+    expect(imported).toMatchObject({ start: '192.0.2.10', end: '192.0.2.20' });
+  });
+
+  it('imports ISC dynamic-bootp and single-address ranges without shifting operands', () => {
+    const text = `subnet 198.51.100.0 netmask 255.255.255.0 {
+      range dynamic-bootp 198.51.100.10 198.51.100.20;
+      range 198.51.100.30;
+    }`;
+
+    const pools = importDhcpConfiguration({ text, format: 'isc-dhcpd' }).configuration.pools;
+
+    expect(pools).toEqual(expect.arrayContaining([
+      expect.objectContaining({ start: '198.51.100.10', end: '198.51.100.20' }),
+      expect.objectContaining({ start: '198.51.100.30', end: '198.51.100.30' }),
+    ]));
+  });
+
+  it('warns and omits dnsmasq static and proxy ranges instead of modeling dynamic pools', () => {
+    const text = `dhcp-range=192.0.2.0,static,255.255.255.0\ndhcp-range=198.51.100.0,proxy`;
+
+    const { configuration, warnings } = importDhcpConfiguration({ text, format: 'dnsmasq' });
+
+    expect(configuration.pools).toEqual([]);
+    expect(warnings).toContainEqual(expect.objectContaining({ code: 'unsupported-directive', count: 2 }));
+  });
+
+  it('rejects unrelated XML roots during detection and explicit Microsoft import', () => {
+    const unrelated = '<?xml version="1.0"?><inventory><item>example</item></inventory>';
+
+    expect(detectDhcpConfigFormat(unrelated, 'inventory.xml')).toBe('unknown');
+    try {
+      importDhcpConfiguration({ text: unrelated, format: 'microsoft-xml' });
+      throw new Error('Expected import to fail.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigImportError);
+      expect((error as ConfigImportError).code).toBe('UNKNOWN_FORMAT');
+    }
+  });
+
   it.each([
     ['UNSAFE_XML', '<!DOCTYPE x [<!ENTITY y "z">]><DhcpServerExport/>', 'export.xml'],
     ['MALFORMED_XML', '<DhcpServerExport><Scope></DhcpServerExport>', 'export.xml'],
@@ -171,11 +237,39 @@ describe('importDhcpConfiguration', () => {
   it('rejects UTF-8 input larger than 2 MiB before parsing', () => {
     expectImportError(`{"Dhcp4":"${'x'.repeat(2 * 1024 * 1024)}"}`, 'kea.json', 'INPUT_TOO_LARGE');
   });
+
+  it.each([
+    ['kea-json', `{"Dhcp4":{"nested":${'['.repeat(70)}0${']'.repeat(70)}}}`],
+    ['isc-dhcpd', `${'group documentation {'.repeat(70)}${'}'.repeat(70)}`],
+  ] as const)('rejects excessively deep %s structures with a stable code', (format, text) => {
+    expectImportErrorWithFormat(text, format, 'STRUCTURE_TOO_COMPLEX');
+  });
+
+  it.each([
+    ['kea-json', `{"Dhcp4":{"values":[${Array.from({ length: 20_100 }, () => '0').join(',')}]}}`],
+    ['isc-dhcpd', 'unknown-directive;\n'.repeat(20_100)],
+  ] as const)('rejects excessively complex %s structures with a stable code', (format, text) => {
+    expectImportErrorWithFormat(text, format, 'STRUCTURE_TOO_COMPLEX');
+  });
 });
 
 function expectImportError(text: string, fileName: string, code: ConfigImportError['code']): void {
   try {
     importDhcpConfiguration({ text, fileName });
+    throw new Error('Expected import to fail.');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConfigImportError);
+    expect((error as ConfigImportError).code).toBe(code);
+  }
+}
+
+function expectImportErrorWithFormat(
+  text: string,
+  format: 'kea-json' | 'isc-dhcpd',
+  code: ConfigImportError['code'],
+): void {
+  try {
+    importDhcpConfiguration({ text, format });
     throw new Error('Expected import to fail.');
   } catch (error) {
     expect(error).toBeInstanceOf(ConfigImportError);

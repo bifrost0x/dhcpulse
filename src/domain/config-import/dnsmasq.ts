@@ -10,12 +10,15 @@ import {
   addWarning,
   assignReservationsToScopes,
   isLeaseValue,
+  ipv6NetworkAddress,
   maskToPrefix,
   networkAddress,
+  normalizeReservationIdentifier,
   optionCode,
   optional,
   parseLeaseSeconds,
   provenance,
+  reservationConfigId,
   splitDnsmasq,
   takeTags,
   valueKey,
@@ -81,6 +84,7 @@ function importRange(configuration: DhcpConfiguration, parts: string[], location
   const protocol = start.includes(':') ? 'dhcpv6' as const : 'dhcpv4' as const;
   const endOrConstructor = remaining.shift();
   if (!endOrConstructor) return 1;
+  if ([endOrConstructor, ...remaining].some((part) => /^(?:static|proxy)$/i.test(part))) return 1;
   let end = endOrConstructor;
   let prefixLength: number | undefined;
   let mask: string | undefined;
@@ -95,7 +99,7 @@ function importRange(configuration: DhcpConfiguration, parts: string[], location
   if (endOrConstructor.startsWith('constructor:')) end = endOrConstructor;
   const cidr = protocol === 'dhcpv4'
     ? `${networkAddress(start, mask ?? '255.255.255.0')}/${maskToPrefix(mask ?? '255.255.255.0')}`
-    : `${start}/${prefixLength ?? 64}`;
+    : `${ipv6NetworkAddress(start, prefixLength ?? 64)}/${prefixLength ?? 64}`;
   const scope: DhcpScope = {
     id: deterministicConfigId('scope', protocol, cidr),
     provenance: provenance('dnsmasq', location),
@@ -130,17 +134,18 @@ function isContiguousIpv4Mask(value: string): boolean {
 function importHost(configuration: DhcpConfiguration, parts: string[], location: string, tags: Set<string>): void {
   const remaining = [...parts];
   const hostTags = takeTags(remaining, tags);
-  const mac = remaining.find((part) => /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(part));
+  const mac = remaining.find((part) => /^(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(part));
   const duid = remaining.find((part) => /^(?:[0-9a-f]{2}:){6,}[0-9a-f]{2}$/i.test(part));
   const rawAddress = remaining.find((part) => /^\[?[0-9a-f:.]+\]?(?:\/\d+)?$/i.test(part) && (part.includes('.') || part.includes(':')) && part !== mac && part !== duid);
   if (!rawAddress) return;
   const address = rawAddress.replace(/^\[|\]$/g, '');
   const protocol = address.includes(':') ? 'dhcpv6' as const : 'dhcpv4' as const;
   const hostname = remaining.find((part) => part !== mac && part !== duid && part !== rawAddress && !isLeaseValue(part) && !part.startsWith('id:'));
-  const identifier = mac ?? duid ?? remaining.find((part) => part.startsWith('id:'))?.slice(3);
-  const identifierType: ReservationIdentifierType | undefined = mac ? 'mac' : duid ? 'duid' : identifier ? 'client-id' : hostname ? 'hostname' : undefined;
+  const rawIdentifier = mac ?? duid ?? remaining.find((part) => part.startsWith('id:'))?.slice(3);
+  const hintedIdentifierType: ReservationIdentifierType | undefined = mac ? 'mac' : duid ? 'duid' : rawIdentifier ? 'client-id' : hostname ? 'hostname' : undefined;
+  const { identifier, identifierType } = normalizeReservationIdentifier(rawIdentifier, hintedIdentifierType);
   configuration.reservations.push({
-    id: deterministicConfigId('reservation', protocol, identifier, hostname, address),
+    id: reservationConfigId(protocol, identifier, identifierType, hostname, address),
     provenance: provenance('dnsmasq', location),
     protocol,
     address,

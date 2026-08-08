@@ -24,7 +24,10 @@ export interface ConfigImportResult {
 
 export function detectDhcpConfigFormat(text: string, fileName?: string): DhcpConfigFormat {
   const sample = text.replace(/^\uFEFF/, '').slice(0, 256 * 1024);
-  if (/^\s*<\?xml\b|^\s*<[\w-]+:?(?:dhcpserverexport|dhcpserver)\b/i.test(sample)) return 'microsoft-xml';
+  const xmlBody = sample.replace(/^\s*<\?xml[^>]*\?>/i, '').trimStart();
+  if (/^<(?:(?:[\w.-]+):)?(?:dhcpserverexport|dhcpserver)\b/i.test(xmlBody)) return 'microsoft-xml';
+  if (/<!DOCTYPE\b|<!ENTITY\b/i.test(xmlBody) && /<(?:(?:[\w.-]+):)?(?:dhcpserverexport|dhcpserver)\b/i.test(xmlBody)) return 'microsoft-xml';
+  if (xmlBody.startsWith('<')) return 'unknown';
   if (/"Dhcp[46]"\s*:/i.test(sample)) return 'kea-json';
   if (/^\s*(?:--)?(?:dhcp-range|dhcp-host|dhcp-option|dhcp-relay|dhcp-authoritative)\b/m.test(sample)) return 'dnsmasq';
   if (/\bsubnet\s+[0-9.]+\s+netmask\s+[0-9.]+\s*\{|\bshared-network\s+|\bfailover\s+peer\s+/i.test(sample)) return 'isc-dhcpd';

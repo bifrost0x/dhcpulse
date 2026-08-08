@@ -3,7 +3,9 @@ import type {
   DhcpConfigFormat,
   DhcpConfiguration,
   ParserWarning,
+  ReservationIdentifierType,
 } from '../config-model';
+import { deterministicConfigId } from '../config-model';
 
 export type ImportFormat = Exclude<DhcpConfigFormat, 'unknown'>;
 export type ConfigImportErrorCode =
@@ -11,7 +13,11 @@ export type ConfigImportErrorCode =
   | 'UNSAFE_XML'
   | 'MALFORMED_XML'
   | 'MALFORMED_JSON'
+  | 'STRUCTURE_TOO_COMPLEX'
   | 'UNKNOWN_FORMAT';
+
+export const MAX_STRUCTURE_DEPTH = 64;
+export const MAX_STRUCTURE_NODES = 20_000;
 
 export class ConfigImportError extends Error {
   readonly code: ConfigImportErrorCode;
@@ -20,6 +26,27 @@ export class ConfigImportError extends Error {
     super(message);
     this.name = 'ConfigImportError';
     this.code = code;
+  }
+}
+
+export function assertStructureBounds(value: unknown): void {
+  const pending: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) break;
+    nodes += 1;
+    if (nodes > MAX_STRUCTURE_NODES || current.depth > MAX_STRUCTURE_DEPTH) {
+      throw new ConfigImportError(
+        'STRUCTURE_TOO_COMPLEX',
+        'DHCP configuration structure exceeds the supported depth or complexity limit.',
+      );
+    }
+    if (Array.isArray(current.value)) {
+      for (const child of current.value) pending.push({ value: child, depth: current.depth + 1 });
+    } else if (typeof current.value === 'object' && current.value !== null) {
+      for (const child of Object.values(current.value)) pending.push({ value: child, depth: current.depth + 1 });
+    }
   }
 }
 
@@ -55,6 +82,50 @@ export function networkAddress(address: string, mask: string): string {
   return addressParts.map((part, index) => part & (maskParts[index] ?? 0)).join('.');
 }
 
+export function ipv6NetworkAddress(address: string, prefixLength: number): string {
+  if (!Number.isInteger(prefixLength) || prefixLength < 0 || prefixLength > 128) return address;
+  const halves = address.replace(/^\[|\]$/g, '').split('::');
+  if (halves.length > 2) return address;
+  const leading = halves[0] ? halves[0].split(':') : [];
+  const trailing = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - leading.length - trailing.length;
+  if ((halves.length === 1 && missing !== 0) || missing < 0) return address;
+  const groups = [...leading, ...Array.from({ length: missing }, () => '0'), ...trailing];
+  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/i.test(group))) return address;
+  const value = groups.reduce((total, group) => (total << 16n) | BigInt(`0x${group}`), 0n);
+  const hostBits = BigInt(128 - prefixLength);
+  const network = prefixLength === 0 ? 0n : (value >> hostBits) << hostBits;
+  const networkGroups = Array.from({ length: 8 }, (_, index) => {
+    const shift = BigInt((7 - index) * 16);
+    return Number((network >> shift) & 0xffffn).toString(16);
+  });
+  return compressIpv6(networkGroups);
+}
+
+function compressIpv6(groups: string[]): string {
+  let bestStart = -1;
+  let bestLength = 0;
+  for (let index = 0; index < groups.length;) {
+    if (groups[index] !== '0') {
+      index += 1;
+      continue;
+    }
+    let end = index;
+    while (end < groups.length && groups[end] === '0') end += 1;
+    if (end - index > bestLength) {
+      bestStart = index;
+      bestLength = end - index;
+    }
+    index = end;
+  }
+  if (bestLength < 2) return groups.join(':');
+  const compressed = [...groups];
+  compressed.splice(bestStart, bestLength, '');
+  if (bestStart === 0) compressed.unshift('');
+  if (bestStart + bestLength === groups.length) compressed.push('');
+  return compressed.join(':');
+}
+
 export function assignReservationsToScopes(configuration: DhcpConfiguration): void {
   for (const reservation of configuration.reservations) {
     if (reservation.scopeId) continue;
@@ -65,6 +136,36 @@ export function assignReservationsToScopes(configuration: DhcpConfiguration): vo
       reservation.level = 'scope';
     }
   }
+}
+
+export function normalizeReservationIdentifier(
+  value: string | undefined,
+  hintedType: ReservationIdentifierType | undefined,
+): { identifier?: string; identifierType?: ReservationIdentifierType } {
+  if (!value) return hintedType ? { identifierType: hintedType } : {};
+  const compactMac = value.replace(/[:-]/g, '');
+  if (/^[0-9a-f]{12}$/i.test(compactMac)) {
+    return {
+      identifier: compactMac.toLowerCase().match(/.{2}/g)?.join(':'),
+      identifierType: 'mac',
+    };
+  }
+  return { identifier: value, ...(hintedType ? { identifierType: hintedType } : {}) };
+}
+
+export function reservationConfigId(
+  protocol: 'dhcpv4' | 'dhcpv6',
+  identifier: string | undefined,
+  identifierType: ReservationIdentifierType | undefined,
+  hostname: string | undefined,
+  address: string,
+): string {
+  return deterministicConfigId(
+    'reservation',
+    protocol,
+    identifierType,
+    identifier ?? hostname ?? address,
+  );
 }
 
 function addressInCidr(address: string, cidr: string): boolean {

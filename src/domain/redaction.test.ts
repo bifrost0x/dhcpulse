@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import kea from '../test/fixtures/kea.json?raw';
+import isc from '../test/fixtures/isc-dhcpd.conf?raw';
 import { importDhcpConfiguration } from './config-import';
 import { createRedactor, exportAssessment, redactConfiguration } from './redaction';
 
@@ -94,5 +95,57 @@ describe('exportAssessment', () => {
 
     expect(exported).not.toContain('client-only-opaque-id');
     expect(exported).toMatch(/duid-[0-9a-f]{12}/);
+  });
+
+  it.each(['markdown', 'json'] as const)('redacts single-label failover hostnames with server equality in %s', (format) => {
+    const configuration = importDhcpConfiguration({ text: kea, fileName: 'kea.json' }).configuration;
+    configuration.servers[0]!.name = 'dhcp-primary';
+    configuration.failoverRelationships[0]!.partner = 'dhcp-primary';
+
+    const exported = exportAssessment(configuration, [{ message: 'Partner dhcp-primary must be reachable.' }], { format });
+
+    expect(exported).not.toContain('dhcp-primary');
+    if (format === 'json') {
+      const payload = JSON.parse(exported) as { configuration: typeof configuration };
+      expect(payload.configuration.servers[0]?.name).toBe(payload.configuration.failoverRelationships[0]?.partner);
+    }
+  });
+
+  it.each(['markdown', 'json'] as const)('redacts topology labels and preserves label equality in %s', (format) => {
+    const configuration = importDhcpConfiguration({ text: kea, fileName: 'kea.json' }).configuration;
+    configuration.ipv4Scopes[0]!.name = 'prod-lan';
+    configuration.ipv4Scopes[0]!.sharedNetwork = 'corp-secret';
+    configuration.pools[0]!.tags = ['finance-prod'];
+    configuration.reservations[0]!.tags = ['finance-prod'];
+    configuration.options[0]!.tags = ['finance-prod'];
+    configuration.relayAddresses[0]!.interfaceName = 'private-uplink';
+    configuration.policies.push({
+      id: 'policy-documentation',
+      provenance: { format: 'kea-json', location: '$.synthetic' },
+      kind: 'policy',
+      name: 'prod-lan',
+    });
+
+    const exported = exportAssessment(configuration, [{ message: 'prod-lan corp-secret finance-prod private-uplink' }], { format });
+
+    for (const secret of ['prod-lan', 'corp-secret', 'finance-prod', 'private-uplink']) {
+      expect(exported).not.toContain(secret);
+    }
+    if (format === 'json') {
+      const payload = JSON.parse(exported) as { configuration: typeof configuration };
+      expect(payload.configuration.ipv4Scopes[0]?.name).toBe(payload.configuration.policies.at(-1)?.name);
+      expect(payload.configuration.pools[0]?.tags).toEqual(payload.configuration.reservations[0]?.tags);
+      expect(payload.configuration.reservations[0]?.tags).toEqual(payload.configuration.options[0]?.tags);
+    }
+  });
+
+  it('preserves the address family of an ISC failover partner', () => {
+    const configuration = importDhcpConfiguration({ text: isc, fileName: 'dhcpd.conf' }).configuration;
+    const originalPartner = configuration.failoverRelationships[0]!.partner!;
+
+    const redacted = redactConfiguration(configuration, 'failover-address');
+
+    expect(redacted.failoverRelationships[0]?.partner).toMatch(/^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/);
+    expect(redacted.failoverRelationships[0]?.partner).not.toBe(originalPartner);
   });
 });

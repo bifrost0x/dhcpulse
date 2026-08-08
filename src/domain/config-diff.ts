@@ -225,30 +225,39 @@ function compareEntities<T extends NormalizedEntity>(
   const afterGroups = groupBy(comparison.after, comparison.key);
   const keys = [...new Set([...beforeGroups.keys(), ...afterGroups.keys()])].sort();
   for (const key of keys) {
-    const previousCandidates = [...(beforeGroups.get(key) ?? [])];
-    const nextCandidates = [...(afterGroups.get(key) ?? [])];
-    const previousItems: T[] = [];
+    const previousCandidates = (beforeGroups.get(key) ?? []).map((entity) => ({
+      entity,
+      comparable: comparison.comparable(entity),
+    })).map((item) => ({ ...item, serialized: stableStringify(item.comparable) }));
+    const nextCandidates = (afterGroups.get(key) ?? []).map((entity) => ({
+      entity,
+      comparable: comparison.comparable(entity),
+      matched: false,
+    })).map((item) => ({ ...item, serialized: stableStringify(item.comparable) }));
+    const exactQueues = groupBy(nextCandidates, ({ serialized }) => serialized);
+    const previousItems: typeof previousCandidates = [];
     for (const previous of previousCandidates) {
-      const comparable = stableStringify(comparison.comparable(previous));
-      const exactIndex = nextCandidates.findIndex((next) => stableStringify(comparison.comparable(next)) === comparable);
-      if (exactIndex >= 0) nextCandidates.splice(exactIndex, 1);
+      const exact = exactQueues.get(previous.serialized)?.pop();
+      if (exact) exact.matched = true;
       else previousItems.push(previous);
     }
-    previousItems.sort((left, right) => compareStable(comparison.comparable(left), comparison.comparable(right)));
-    const nextItems = nextCandidates.sort((left, right) => compareStable(comparison.comparable(left), comparison.comparable(right)));
+    previousItems.sort((left, right) => left.serialized.localeCompare(right.serialized));
+    const nextItems = nextCandidates.filter(({ matched }) => !matched).sort((left, right) => left.serialized.localeCompare(right.serialized));
     const length = Math.max(previousItems.length, nextItems.length);
     for (let index = 0; index < length; index += 1) {
-      const previous = previousItems[index];
-      const next = nextItems[index];
+      const previousItem = previousItems[index];
+      const nextItem = nextItems[index];
+      const previous = previousItem?.entity;
+      const next = nextItem?.entity;
       const kind: ConfigurationChangeKind = previous && next ? 'changed' : previous ? 'removed' : 'added';
-      if (previous && next && stableStringify(comparison.comparable(previous)) === stableStringify(comparison.comparable(next))) continue;
+      if (previousItem && nextItem && previousItem.serialized === nextItem.serialized) continue;
       const assessment = comparison.assess(kind, previous, next);
       pushChange(changes, redactor, {
         kind,
         entityType: comparison.entityType,
         semanticPath: comparison.path(key, index, previous ?? next!),
-        before: previous ? comparison.comparable(previous) : null,
-        after: next ? comparison.comparable(next) : null,
+        before: previousItem?.comparable ?? null,
+        after: nextItem?.comparable ?? null,
         ...assessment,
       });
     }
@@ -265,9 +274,11 @@ function assessPool(
   if (kind === 'changed' && previous && next) {
     const previousCapacity = ipv4RangeSize(previous.start, previous.end);
     const nextCapacity = ipv4RangeSize(next.start, next.end);
-    const scope = scopesAfter.find(({ id }) => id === next.scopeId) ?? scopesBefore.find(({ id }) => id === previous.scopeId);
+    const sourceScope = scopesBefore.find(({ id }) => id === previous.scopeId);
+    const targetScope = scopesAfter.find(({ id }) => id === next.scopeId);
+    const observedLeaseCount = sourceScope?.observedLeaseCount ?? targetScope?.observedLeaseCount;
     if (previousCapacity !== undefined && nextCapacity !== undefined && nextCapacity < previousCapacity) {
-      if (scope?.observedLeaseCount !== undefined && nextCapacity < scope.observedLeaseCount) {
+      if (observedLeaseCount !== undefined && nextCapacity < observedLeaseCount) {
         return { impact: 'blocker', explanation: 'The pool shrank below the observed lease count.' };
       }
       return { impact: 'warning', explanation: 'The dynamic address pool shrank.' };
@@ -384,7 +395,15 @@ function redactSafe(value: unknown, redactor: Redactor): RedactionSafeValue {
   if (Array.isArray(value)) return value.map((item) => redactSafe(item, redactor));
   if (typeof value === 'object') {
     const item = value as Record<string, unknown>;
+    const clientIdentifierOption = item.protocol === 'dhcpv4'
+      && (item.code === 61 || /(?:client[- ]?id|client.*identifier)/i.test(typeof item.name === 'string' ? item.name : ''));
     return Object.fromEntries(Object.entries(item).map(([key, child]) => {
+      if (key === 'value' && clientIdentifierOption) {
+        if (typeof child === 'string') return [key, redactor.redactIdentifier(child)];
+        if (Array.isArray(child)) {
+          return [key, child.map((entry) => typeof entry === 'string' ? redactor.redactIdentifier(entry) : redactSafe(entry, redactor))];
+        }
+      }
       if (key === 'identifier' && typeof child === 'string') {
         return [key, item.identifierType === 'mac' ? redactor.redactMac(child) : redactor.redactIdentifier(child)];
       }
@@ -420,10 +439,6 @@ function semanticPath(prefix: string, key: string, index: number, redactor: Reda
   const safePrefix = redactor.redactText(prefix);
   const safeKey = deterministicConfigId('identity', key);
   return `${safePrefix}/${safeKey}${index > 0 ? `/${index}` : ''}`;
-}
-
-function compareStable(left: unknown, right: unknown): number {
-  return stableStringify(left).localeCompare(stableStringify(right));
 }
 
 function stableStringify(value: unknown): string {
