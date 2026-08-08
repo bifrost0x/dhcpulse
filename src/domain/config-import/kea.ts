@@ -227,7 +227,7 @@ function importReservations(
     const identifier = normalizedIdentifier.identifier;
     const hostname = stringValue(reservation.hostname);
     const normalized: DhcpReservation = {
-      id: reservationConfigId(protocol, identifier, identifierType, hostname, address),
+      id: reservationConfigId(protocol, identifier, identifierType, hostname, address, scope?.id),
       provenance: provenance('kea-json', `${path}[${index}]`),
       protocol,
       ...(scope ? { scopeId: scope.id } : {}),

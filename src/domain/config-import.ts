@@ -24,7 +24,7 @@ export interface ConfigImportResult {
 
 export function detectDhcpConfigFormat(text: string, fileName?: string): DhcpConfigFormat {
   const sample = text.replace(/^\uFEFF/, '').slice(0, 256 * 1024);
-  const xmlBody = sample.replace(/^\s*<\?xml[^>]*\?>/i, '').trimStart();
+  const xmlBody = stripXmlPreamble(sample);
   if (/^<(?:(?:[\w.-]+):)?(?:dhcpserverexport|dhcpserver)\b/i.test(xmlBody)) return 'microsoft-xml';
   if (/<!DOCTYPE\b|<!ENTITY\b/i.test(xmlBody) && /<(?:(?:[\w.-]+):)?(?:dhcpserverexport|dhcpserver)\b/i.test(xmlBody)) return 'microsoft-xml';
   if (xmlBody.startsWith('<')) return 'unknown';
@@ -38,6 +38,15 @@ export function detectDhcpConfigFormat(text: string, fileName?: string): DhcpCon
   if (/(^|[\\/])dhcpd(?:\.conf)?$/.test(lowerName)) return 'isc-dhcpd';
   if (/(^|[\\/])dnsmasq(?:\.conf)?$/.test(lowerName)) return 'dnsmasq';
   return 'unknown';
+}
+
+function stripXmlPreamble(sample: string): string {
+  let body = sample.trimStart().replace(/^<\?xml(?:\s[^?]*?)?\?>/i, '').trimStart();
+  while (true) {
+    const miscellaneous = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>)\s*/.exec(body);
+    if (!miscellaneous) return body;
+    body = body.slice(miscellaneous[0].length);
+  }
 }
 
 export function importDhcpConfiguration(input: ConfigImportInput): ConfigImportResult {

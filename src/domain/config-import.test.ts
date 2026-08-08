@@ -24,6 +24,14 @@ describe('detectDhcpConfigFormat', () => {
   it('prefers recognizable content over a misleading extension', () => {
     expect(detectDhcpConfigFormat(kea, 'misleading.xml')).toBe('kea-json');
   });
+
+  it('accepts Microsoft XML with leading comments and processing instructions', () => {
+    const body = microsoftXml.replace(/^<\?xml[^>]*\?>/, '');
+    const text = `<?xml version="1.0"?>\n<!-- synthetic documentation -->\n<?dhcp-test bounded?>\n${body}`;
+
+    expect(detectDhcpConfigFormat(text, 'export.xml')).toBe('microsoft-xml');
+    expect(importDhcpConfiguration({ text }).configuration.ipv4Scopes.length).toBeGreaterThan(0);
+  });
 });
 
 describe('importDhcpConfiguration', () => {
@@ -175,6 +183,39 @@ describe('importDhcpConfiguration', () => {
     expect(reservations.map(({ identifier }) => identifier)).toEqual(Array(4).fill('02:00:5e:10:00:aa'));
     expect(reservations.map(({ identifierType }) => identifierType)).toEqual(Array(4).fill('mac'));
     expect(new Set(reservations.map(({ id }) => id)).size).toBe(1);
+  });
+
+  it('keeps repeated MAC reservations and their options unique across scopes', () => {
+    const text = `{"Dhcp4":{"subnet4":[
+      {"subnet":"192.0.2.0/24","reservations":[{"hw-address":"02:00:5e:10:00:aa","ip-address":"192.0.2.50","option-data":[{"code":223,"data":"first"}]}]},
+      {"subnet":"198.51.100.0/24","reservations":[{"hw-address":"02:00:5e:10:00:aa","ip-address":"198.51.100.50","option-data":[{"code":223,"data":"second"}]}]}
+    ]}}`;
+
+    const configuration = importDhcpConfiguration({ text, format: 'kea-json' }).configuration;
+    const reservationIds = configuration.reservations.map(({ id }) => id);
+    const ownerIds = configuration.options.filter(({ code }) => code === 223).map(({ reservationId }) => reservationId);
+
+    expect(new Set(reservationIds).size).toBe(2);
+    expect(new Set(ownerIds).size).toBe(2);
+    expect(new Set(ownerIds)).toEqual(new Set(reservationIds));
+    expect(new Set(configuration.options.filter(({ code }) => code === 223).map(({ id }) => id)).size).toBe(2);
+  });
+
+  it('preserves explicit 12-hex client identifiers in Kea and dnsmasq', () => {
+    const configurations = [
+      importDhcpConfiguration({
+        text: `{"Dhcp4":{"reservations":[{"client-id":"02005e1000aa","ip-address":"192.0.2.50"}]}}`,
+        format: 'kea-json',
+      }).configuration,
+      importDhcpConfiguration({ text: 'dhcp-host=id:02005e1000aa,192.0.2.50', format: 'dnsmasq' }).configuration,
+    ];
+
+    for (const configuration of configurations) {
+      expect(configuration.reservations[0]).toMatchObject({
+        identifier: '02005e1000aa',
+        identifierType: 'client-id',
+      });
+    }
   });
 
   it.each([

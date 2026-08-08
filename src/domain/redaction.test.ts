@@ -148,4 +148,19 @@ describe('exportAssessment', () => {
     expect(redacted.failoverRelationships[0]?.partner).toMatch(/^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/);
     expect(redacted.failoverRelationships[0]?.partner).not.toBe(originalPartner);
   });
+
+  it.each(['markdown', 'json'] as const)('redacts dnsmasq constructor interfaces while preserving semantics in %s', (format) => {
+    const text = `dhcp-range=2001:db8:40::100,constructor:private-uplink,64\ndhcp-relay=203.0.113.1,203.0.113.2,private-uplink`;
+    const configuration = importDhcpConfiguration({ text, format: 'dnsmasq' }).configuration;
+
+    const exported = exportAssessment(configuration, [{ message: 'Use private-uplink for constructor allocation.' }], { format });
+
+    expect(exported).not.toContain('private-uplink');
+    expect(exported).toContain('constructor:');
+    if (format === 'json') {
+      const payload = JSON.parse(exported) as { configuration: typeof configuration };
+      const constructor = payload.configuration.pools[0]?.end.replace(/^constructor:/, '');
+      expect(constructor).toBe(payload.configuration.relayAddresses[0]?.interfaceName);
+    }
+  });
 });

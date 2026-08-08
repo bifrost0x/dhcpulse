@@ -194,7 +194,7 @@ function importHost(configuration: DhcpConfiguration, block: IscBlock, name: str
   const hardware = statementValues(block.children, ['hardware', 'ethernet'])[0];
   const normalizedIdentifier = normalizeReservationIdentifier(hardware ?? name, hardware ? 'mac' : 'hostname');
   const reservation: DhcpReservation = {
-    id: reservationConfigId('dhcpv4', normalizedIdentifier.identifier, normalizedIdentifier.identifierType, name, fixedAddress),
+    id: reservationConfigId('dhcpv4', normalizedIdentifier.identifier, normalizedIdentifier.identifierType, name, fixedAddress, context.scope?.id),
     provenance: provenance('isc-dhcpd', tokenLocation(block.header[0])),
     protocol: 'dhcpv4',
     ...(context.scope ? { scopeId: context.scope.id } : {}),

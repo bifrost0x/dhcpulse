@@ -113,16 +113,23 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   for (const element of elements(root, ['reservation'])) {
     const address = firstText(element, ['ipaddress', 'reservedip', 'address']);
     if (!address) continue;
-    const rawIdentifier = firstText(element, ['clientid', 'duid', 'macaddress']);
+    const clientId = firstText(element, ['clientid']);
+    const duid = firstText(element, ['duid']);
+    const macAddress = firstText(element, ['macaddress']);
+    const rawIdentifier = macAddress ?? duid ?? clientId;
     const hostname = firstText(element, ['name', 'hostname']);
     const scope = nearestScope(element, scopeByElement);
     const protocol = address.includes(':') ? 'dhcpv6' : 'dhcpv4';
     const hintedIdentifierType: ReservationIdentifierType | undefined = rawIdentifier
-      ? protocol === 'dhcpv6' ? 'duid' : 'client-id'
+      ? macAddress ? 'mac' : duid ? 'duid' : protocol === 'dhcpv6' ? 'duid' : 'client-id'
       : hostname ? 'hostname' : undefined;
-    const { identifier, identifierType } = normalizeReservationIdentifier(rawIdentifier, hintedIdentifierType);
+    const { identifier, identifierType } = normalizeReservationIdentifier(
+      rawIdentifier,
+      hintedIdentifierType,
+      Boolean(clientId && protocol === 'dhcpv4'),
+    );
     configuration.reservations.push({
-      id: reservationConfigId(protocol, identifier, identifierType, hostname, address),
+      id: reservationConfigId(protocol, identifier, identifierType, hostname, address, scope?.id),
       provenance: provenance(format, xmlPath(element)),
       protocol,
       ...(scope ? { scopeId: scope.id } : {}),

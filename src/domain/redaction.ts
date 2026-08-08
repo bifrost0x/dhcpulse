@@ -101,7 +101,10 @@ export function redactConfiguration(configuration: DhcpConfiguration, seed = 'dh
   }
   for (const pool of copy.pools) {
     pool.start = redactAddress(pool.start, redactor);
-    pool.end = pool.end.startsWith('constructor:') ? pool.end : redactAddress(pool.end, redactor);
+    const constructorInterface = constructorInterfaceName(pool.end);
+    pool.end = constructorInterface
+      ? `constructor:${redactor.redactLabel(constructorInterface)}`
+      : redactAddress(pool.end, redactor);
     if (pool.tags) pool.tags = pool.tags.map(redactor.redactLabel);
   }
   for (const exclusion of copy.exclusions) {
@@ -217,6 +220,8 @@ function sensitiveReplacements(configuration: DhcpConfiguration, redactor: Redac
     add(scope.sharedNetwork, scope.sharedNetwork ? redactor.redactLabel(scope.sharedNetwork) : undefined);
   }
   for (const pool of configuration.pools) {
+    const constructorInterface = constructorInterfaceName(pool.end);
+    add(constructorInterface, constructorInterface ? redactor.redactLabel(constructorInterface) : undefined);
     for (const tag of pool.tags ?? []) add(tag, redactor.redactLabel(tag));
   }
   for (const reservation of configuration.reservations) {
@@ -284,6 +289,11 @@ function redactHostOrAddress(value: string, redactor: Redactor): string {
   if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(value)) return redactor.redactIpv4(value);
   if (value.includes(':')) return redactor.redactIpv6(value);
   return redactor.redactHostname(value);
+}
+
+function constructorInterfaceName(value: string): string | undefined {
+  const match = /^constructor:(.+)$/i.exec(value);
+  return match?.[1];
 }
 
 function redactFileName(value: string): string {

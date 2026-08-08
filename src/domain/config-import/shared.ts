@@ -128,12 +128,27 @@ function compressIpv6(groups: string[]): string {
 
 export function assignReservationsToScopes(configuration: DhcpConfiguration): void {
   for (const reservation of configuration.reservations) {
-    if (reservation.scopeId) continue;
-    const scopes = reservation.protocol === 'dhcpv4' ? configuration.ipv4Scopes : configuration.ipv6Scopes;
-    const scope = scopes.find((item) => addressInCidr(reservation.address, item.cidr));
-    if (scope) {
-      reservation.scopeId = scope.id;
-      reservation.level = 'scope';
+    if (!reservation.scopeId) {
+      const scopes = reservation.protocol === 'dhcpv4' ? configuration.ipv4Scopes : configuration.ipv6Scopes;
+      const scope = scopes.find((item) => addressInCidr(reservation.address, item.cidr));
+      if (scope) {
+        reservation.scopeId = scope.id;
+        reservation.level = 'scope';
+      }
+    }
+    const previousId = reservation.id;
+    reservation.id = reservationConfigId(
+      reservation.protocol,
+      reservation.identifier,
+      reservation.identifierType,
+      reservation.hostname,
+      reservation.address,
+      reservation.scopeId,
+    );
+    if (previousId !== reservation.id) {
+      for (const option of configuration.options) {
+        if (option.reservationId === previousId) option.reservationId = reservation.id;
+      }
     }
   }
 }
@@ -141,10 +156,11 @@ export function assignReservationsToScopes(configuration: DhcpConfiguration): vo
 export function normalizeReservationIdentifier(
   value: string | undefined,
   hintedType: ReservationIdentifierType | undefined,
+  inferMac = false,
 ): { identifier?: string; identifierType?: ReservationIdentifierType } {
   if (!value) return hintedType ? { identifierType: hintedType } : {};
   const compactMac = value.replace(/[:-]/g, '');
-  if (/^[0-9a-f]{12}$/i.test(compactMac)) {
+  if ((hintedType === 'mac' || inferMac) && /^[0-9a-f]{12}$/i.test(compactMac)) {
     return {
       identifier: compactMac.toLowerCase().match(/.{2}/g)?.join(':'),
       identifierType: 'mac',
@@ -159,10 +175,13 @@ export function reservationConfigId(
   identifierType: ReservationIdentifierType | undefined,
   hostname: string | undefined,
   address: string,
+  scopeId?: string,
 ): string {
   return deterministicConfigId(
     'reservation',
     protocol,
+    scopeId ?? 'global',
+    address,
     identifierType,
     identifier ?? hostname ?? address,
   );
