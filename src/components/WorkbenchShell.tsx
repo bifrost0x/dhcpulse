@@ -45,7 +45,7 @@ interface WorkbenchShellProps {
 
 export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) {
   const [route, setRoute] = useState<Route>(() => routeFromHash(window.location.hash));
-  const [leaseResetVersion, setLeaseResetVersion] = useState(0);
+  const [toolResetVersion, setToolResetVersion] = useState(0);
   const routeHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousRouteKindRef = useRef<Route['kind'] | null>(null);
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
@@ -99,15 +99,15 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
     const tool = toolCatalog.find(({ id }) => id === route.id)!;
     if (tool.id === 'lease') {
       mainContent = (
-        <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setLeaseResetVersion((current) => current + 1)}>
-          <LeaseTool key={leaseResetVersion} locale={locale} />
+        <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setToolResetVersion((current) => current + 1)}>
+          <LeaseTool key={toolResetVersion} locale={locale} />
         </ToolFrame>
       );
     } else {
       const Panel = toolComponents[tool.id];
       mainContent = (
-        <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog}>
-          <Panel locale={locale} tool={tool} />
+        <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setToolResetVersion((current) => current + 1)}>
+          <Panel key={`${tool.id}-${toolResetVersion}`} locale={locale} tool={tool} />
         </ToolFrame>
       );
     }

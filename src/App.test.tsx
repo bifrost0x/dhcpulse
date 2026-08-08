@@ -286,6 +286,136 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByText(/Nur lokal in diesem Browser verarbeitet\. Es werden keine Daten hochgeladen\./)).toBeVisible();
   });
 
+  it('derives scope capacity and address facts from the /24 example', () => {
+    renderAt('#/tool/scope');
+    expect(screen.getByText('254', { selector: '.metric-value' })).toBeVisible();
+    expect(screen.getByText('192.0.2.0')).toBeVisible();
+    expect(screen.getByText('255.255.255.0')).toBeVisible();
+    expect(screen.getByText(/106 addresses remain/)).toBeVisible();
+  });
+
+  it('encodes the domain-search example and reports malformed hexadecimal data', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/options');
+    expect(screen.getByText('076578616d706c6503636f6d00036c6162076578616d706c6503636f6d00')).toBeVisible();
+    await user.click(screen.getByRole('radio', { name: 'Decode hexadecimal' }));
+    const hex = screen.getByRole('textbox', { name: 'Hexadecimal value' });
+    await user.clear(hex);
+    await user.type(hex, 'zz');
+    expect(screen.getByText('Value contains non-hexadecimal characters.')).toBeVisible();
+  });
+
+  it('warns about mixed PXE architectures and labels generated snippets review-only', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/pxe');
+    await user.click(screen.getByRole('checkbox', { name: 'Use one global boot file for mixed architectures' }));
+    expect(screen.getByText(/single global boot file cannot safely represent mixed firmware architectures/i)).toBeVisible();
+    expect(screen.getAllByText(/REVIEW ONLY/).length).toBeGreaterThan(0);
+  });
+
+  it('marks failover no-go when TCP port 647 is blocked', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/failover');
+    await user.click(screen.getByRole('checkbox', { name: 'TCP port 647 allowed between partners' }));
+    expect(screen.getByText('No-go')).toBeVisible();
+    expect(screen.getAllByText(/TCP 647/i).length).toBeGreaterThan(0);
+  });
+
+  it('shows 256 delegated /64 prefixes for a /56 DHCPv6 pool', () => {
+    renderAt('#/tool/dhcpv6');
+    expect(screen.getByText('256', { selector: '.metric-value' })).toBeVisible();
+    expect(screen.getByText(/Router Advertisements supply the IPv6 default route/i)).toBeVisible();
+  });
+
+  it('ranks the relay cause and provides packet filters and read-only commands', () => {
+    renderAt('#/tool/diagnostics');
+    expect(screen.getByText('Relay path or server reachability failure')).toBeVisible();
+    expect(screen.getByText('bootp.option.dhcp == 2')).toBeVisible();
+    expect(screen.getByText('ipconfig /all')).toBeVisible();
+    expect(screen.queryByText('ipconfig /renew')).not.toBeInTheDocument();
+  });
+
+  it('lists concrete security gaps without an opaque numeric score', () => {
+    renderAt('#/tool/security');
+    expect(screen.getByText('DHCP snooping is disabled')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Prevent' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Detect' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Recover' })).toBeVisible();
+    expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
+  });
+
+  it('analyzes pasted and file configurations, redacts preview data, and resets sensitive state', async () => {
+    const user = userEvent.setup();
+    const fixture = '{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24","pools":[{"pool":"192.0.2.10 - 192.0.2.20"}],"reservations":[{"hw-address":"02:00:5e:10:00:77","hostname":"secret-host.example.test","ip-address":"192.0.2.50"}]}]}}';
+    renderAt('#/tool/config-analyzer');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Configuration text' }), { target: { value: fixture } });
+    await user.click(screen.getByRole('button', { name: 'Analyze configuration' }));
+    expect(screen.getByText('ISC Kea')).toBeVisible();
+    expect(screen.getByText('1', { selector: '[data-metric="scopes"]' })).toBeVisible();
+    expect(screen.queryByText(/secret-host|02:00:5e:10:00:77/i)).not.toBeInTheDocument();
+    const file = new File([fixture], 'sensitive-lab.json', { type: 'application/json' });
+    const text = vi.fn(async () => fixture);
+    Object.defineProperty(file, 'text', { configurable: true, value: text });
+    await user.upload(screen.getByLabelText('Local configuration file'), file);
+    expect(text).toHaveBeenCalledOnce();
+    expect(screen.getByText('sensitive-lab.json')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.queryByText('Kea')).not.toBeInTheDocument();
+    expect(screen.queryByText('sensitive-lab.json')).not.toBeInTheDocument();
+  });
+
+  it('rejects an oversized analyzer file before File.text is called', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/config-analyzer');
+    const file = new File(['small'], 'oversized.json');
+    const text = vi.fn(async () => '{}');
+    Object.defineProperties(file, { size: { configurable: true, value: 2 * 1024 * 1024 + 1 }, text: { configurable: true, value: text } });
+    await user.upload(screen.getByLabelText('Local configuration file'), file);
+    expect(screen.getByText('Files must be 2 MiB or smaller.')).toBeVisible();
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it('compares configurations and filters added and changed entries', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/config-diff');
+    const before = '{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24","pools":[{"pool":"192.0.2.10 - 192.0.2.20"}]},{"subnet":"203.0.113.0/24","pools":[{"pool":"203.0.113.10 - 203.0.113.20"}]}]}}';
+    const after = '{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24","pools":[{"pool":"192.0.2.10 - 192.0.2.30"}]},{"subnet":"198.51.100.0/24","pools":[{"pool":"198.51.100.10 - 198.51.100.20"}]}]}}';
+    fireEvent.change(screen.getByRole('textbox', { name: 'Source configuration' }), { target: { value: before } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Target configuration' }), { target: { value: after } });
+    await user.click(screen.getByRole('button', { name: 'Compare configurations' }));
+    expect(screen.getAllByText('Added').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Removed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Changed').length).toBeGreaterThan(0);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Change kind' }), 'added');
+    expect(screen.getAllByText('Added').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Changed').filter((element) => element.tagName !== 'OPTION')).toHaveLength(0);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Change kind' }), 'removed');
+    expect(screen.queryAllByText('Removed').filter((element) => element.tagName !== 'OPTION').length).toBeGreaterThan(0);
+  });
+
+  it('downloads a local report and revokes its object URL immediately', async () => {
+    const user = userEvent.setup();
+    const createObjectUrl = vi.fn(() => 'blob:scope-report');
+    const revokeObjectUrl = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl });
+    renderAt('#/tool/scope');
+    await user.click(screen.getByRole('button', { name: 'Download report' }));
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:scope-report');
+  });
+
+  it('renders complete German workbench copy without key fallbacks', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/config-analyzer');
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByRole('button', { name: 'Konfiguration analysieren' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Bericht herunterladen' })).toBeVisible();
+    expect(document.body).not.toHaveTextContent(/workbench\.[a-z]/i);
+  });
+
   it('localizes Header landmark labels and polished German catalog copy', async () => {
     const user = userEvent.setup();
     renderAt();

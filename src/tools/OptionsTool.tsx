@@ -1,6 +1,42 @@
+import { useMemo, useState } from 'react';
+import { decodeDhcpOption, encodeDhcpOption, searchDhcpOptions, validateDhcpOptions } from '../domain/dhcp-options';
+import { buildWorkbenchReport, downloadWorkbenchReport } from '../domain/workbench-export';
+import type { DhcpProtocol } from '../domain/types';
 import type { ToolPanelProps } from './ToolPanel';
-import { ToolPanel } from './ToolPanel';
 
-export function OptionsTool(props: ToolPanelProps) {
-  return <ToolPanel {...props} />;
+const copy = {
+  en: { title: 'Option registry and codec', search: 'Search option registry', protocol: 'Protocol filter', all: 'All protocols', encode: 'Encode typed value', decode: 'Decode hexadecimal', code: 'Option code', value: 'Typed value', hex: 'Hexadecimal value', type: 'Value type', output: 'Normalized output', validation: 'Validation findings', reset: 'Reset', download: 'Download report', assumptions: 'Assumptions and limitations', sources: 'Authoritative sources', empty: 'No validation findings.' },
+  de: { title: 'Optionsregister und Codec', search: 'Optionsregister durchsuchen', protocol: 'Protokollfilter', all: 'Alle Protokolle', encode: 'Typisierten Wert codieren', decode: 'Hexadezimalwert decodieren', code: 'Optionscode', value: 'Typisierter Wert', hex: 'Hexadezimalwert', type: 'Werttyp', output: 'Normalisierte Ausgabe', validation: 'Validierungshinweise', reset: 'Zurücksetzen', download: 'Bericht herunterladen', assumptions: 'Annahmen und Grenzen', sources: 'Maßgebliche Quellen', empty: 'Keine Validierungshinweise.' },
+};
+
+export function OptionsTool({ locale }: ToolPanelProps) {
+  const c = copy[locale];
+  const [query, setQuery] = useState('domain search');
+  const [filter, setFilter] = useState<'all' | DhcpProtocol>('dhcpv4');
+  const [protocol, setProtocol] = useState<DhcpProtocol>('dhcpv4');
+  const [mode, setMode] = useState<'encode' | 'decode'>('encode');
+  const [code, setCode] = useState(119);
+  const [value, setValue] = useState('example.com, lab.example.com');
+  const [hex, setHex] = useState('076578616d706c6503636f6d00036c6162076578616d706c6503636f6d00');
+  const registry = useMemo(() => searchDhcpOptions(query, filter === 'all' ? undefined : filter), [query, filter]);
+  const calculation = useMemo(() => { try { return mode === 'encode' ? { result: encodeDhcpOption({ protocol, code, value: typedValue(protocol, code, value) }), error: '' } : { result: decodeDhcpOption({ protocol, code, hex }), error: '' }; } catch (error) { return { result: null, error: error instanceof Error ? error.message : String(error) }; } }, [mode, protocol, code, value, hex]);
+  const issues = useMemo(() => { try { return validateDhcpOptions([{ protocol, code, value: typedValue(protocol, code, value) }]); } catch { return []; } }, [protocol, code, value]);
+  const reset = () => { setQuery('domain search'); setFilter('dhcpv4'); setProtocol('dhcpv4'); setMode('encode'); setCode(119); setValue('example.com, lab.example.com'); setHex('076578616d706c6503636f6d00036c6162076578616d706c6503636f6d00'); };
+  const findings = [...issues.map((issue) => ({ severity: issue.severity === 'error' ? 'blocker' as const : issue.severity, title: issue.message })), ...(calculation.error ? [{ severity: 'blocker' as const, title: calculation.error }] : [])];
+  const download = () => { const report = buildWorkbenchReport({ toolId: 'options', toolName: locale === 'de' ? 'DHCP-Optionen' : 'DHCP options', generatedAt: new Date().toISOString(), inputs: { protocol, code, mode, value: mode === 'encode' ? value : hex }, findings, assumptions: [locale === 'de' ? 'Unbekannte Optionen werden als Hexdaten behandelt.' : 'Unknown options are treated as hexadecimal data.'], sources: [{ label: 'IANA DHCP Parameters', url: 'https://www.iana.org/assignments/bootp-dhcp-parameters/' }, { label: 'RFC 3397', url: 'https://www.rfc-editor.org/rfc/rfc3397.html' }, { label: 'RFC 3442', url: 'https://www.rfc-editor.org/rfc/rfc3442.html' }] }); downloadWorkbenchReport(report.markdown, 'dhcpulse-options-report.md'); };
+  return <div className="workbench-grid" data-testid="tool-panel-options"><section className="planner-card workbench-form" aria-labelledby="options-title"><h2 id="options-title">{c.title}</h2>
+    <div className="workbench-actions preset-actions"><button type="button" className="secondary-button" onClick={() => { setProtocol('dhcpv4'); setCode(119); setMode('encode'); setValue('example.com, lab.example.com'); }}>Domain-search example</button><button type="button" className="secondary-button" onClick={() => { setProtocol('dhcpv4'); setCode(121); setMode('encode'); setValue('0.0.0.0/0 via 192.0.2.1; 10.20.99.1/16 via 192.0.2.254'); }}>Classless-route example</button></div><div className="workbench-fields"><label className="workbench-field span-2"><span>{c.search}</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} /></label><label className="workbench-field"><span>{c.protocol}</span><select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">{c.all}</option><option value="dhcpv4">DHCPv4</option><option value="dhcpv6">DHCPv6</option></select></label></div>
+    <ul className="registry-list" aria-label={c.search}>{registry.slice(0, 8).map((option) => <li key={`${option.protocol}-${option.code}`}><button type="button" onClick={() => { setProtocol(option.protocol); setCode(option.code); }}><strong>{option.code} - {option.name}</strong><span>{option.valueType} · {option.source}</span></button></li>)}</ul>
+    <fieldset className="mode-switch"><legend className="visually-hidden">Mode</legend><label><input type="radio" name="codec-mode" checked={mode === 'encode'} onChange={() => setMode('encode')} />{c.encode}</label><label><input type="radio" name="codec-mode" checked={mode === 'decode'} onChange={() => setMode('decode')} />{c.decode}</label></fieldset>
+    <div className="workbench-fields"><label className="workbench-field"><span>{c.code}</span><input type="number" min="0" max="65535" value={code} onChange={(event) => setCode(event.target.valueAsNumber || 0)} /></label><label className="workbench-field"><span>Protocol</span><select value={protocol} onChange={(event) => setProtocol(event.target.value as DhcpProtocol)}><option value="dhcpv4">DHCPv4</option><option value="dhcpv6">DHCPv6</option></select></label>{mode === 'encode' ? <label className="workbench-field span-2"><span>{c.value}</span><input value={value} onChange={(event) => setValue(event.target.value)} /></label> : <label className="workbench-field span-2"><span>{c.hex}</span><input value={hex} aria-invalid={Boolean(calculation.error)} aria-describedby={calculation.error ? 'option-error' : undefined} onChange={(event) => setHex(event.target.value)} />{calculation.error && <small id="option-error" className="field-error">{calculation.error}</small>}</label>}</div>
+    <div className="workbench-actions"><button type="button" className="secondary-button" onClick={reset}>{c.reset}</button><button type="button" className="primary-button" onClick={download}>{c.download}</button></div></section>
+    <section className="planner-card workbench-results" role="region" aria-labelledby="option-output"><h2 id="option-output">{c.output}</h2>{calculation.result && <><dl className="fact-grid"><div><dt>{c.type}</dt><dd>{calculation.result.definition?.valueType ?? 'hex'}</dd></div><div><dt>Hex</dt><dd className="mono-break">{calculation.result.hex}</dd></div>{'displayValue' in calculation.result && <div><dt>{c.value}</dt><dd>{String(calculation.result.displayValue)}</dd></div>}</dl>{calculation.result.warnings.map((warning) => <p key={warning} className="field-help">{warning}</p>)}</>}{calculation.error && mode === 'encode' && <p className="field-error" role="alert">{calculation.error}</p>}
+      <section className="workbench-section"><h3>{c.validation}</h3>{issues.length ? <ul className="finding-list-compact">{issues.map((issue) => <li key={`${issue.key}-${issue.code}`} className={`finding-${issue.severity}`}><span className="severity">{issue.severity}</span>{issue.message}</li>)}</ul> : <p>{c.empty}</p>}</section><details className="workbench-section"><summary>{c.assumptions}</summary><p>{locale === 'de' ? 'Codierung folgt dem im lokalen Register definierten Typ. Herstelleroptionen benötigen zusätzliche Prüfung.' : 'Encoding follows the locally registered type. Vendor options require additional review.'}</p></details><section className="workbench-section"><h3>{c.sources}</h3><a href="https://www.iana.org/assignments/bootp-dhcp-parameters/" target="_blank" rel="noreferrer">IANA DHCP Parameters</a></section></section></div>;
+}
+
+function typedValue(protocol: DhcpProtocol, code: number, value: string): unknown {
+  if (protocol === 'dhcpv4' && [51, 58, 59].includes(code)) return Number(value);
+  if ((protocol === 'dhcpv4' && code === 53) || (protocol === 'dhcpv6' && [7, 8].includes(code))) return /^\d+$/.test(value.trim()) ? Number(value) : value;
+  if (protocol === 'dhcpv4' && code === 19) return value === 'true';
+  return value;
 }
