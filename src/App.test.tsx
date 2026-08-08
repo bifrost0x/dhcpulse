@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -19,6 +19,12 @@ const toolNames = [
 function renderAt(hash = '') {
   window.history.replaceState(null, '', hash || '/');
   return render(<App />);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => { resolve = complete; });
+  return { promise, resolve };
 }
 
 describe('DHCPulse Workbench', () => {
@@ -294,6 +300,21 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByText(/106 addresses remain/)).toBeVisible();
   });
 
+  it('models multiple editable scope pool ranges and exposes overlap findings', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/scope');
+    const pools = screen.getByRole('textbox', { name: 'Pool ranges (start-end, one per line)' });
+    await user.clear(pools);
+    await user.type(pools, '192.0.2.10-192.0.2.20{enter}192.0.2.30-192.0.2.40');
+    await user.clear(screen.getByRole('textbox', { name: /Exclusions/ }));
+    await user.clear(screen.getByRole('textbox', { name: /Reservations/ }));
+    expect(screen.getByText('22', { selector: '[data-metric="pool-capacity"]' })).toBeVisible();
+
+    await user.clear(pools);
+    await user.type(pools, '192.0.2.10-192.0.2.30{enter}192.0.2.20-192.0.2.40');
+    expect(screen.getAllByText('Dynamic pools overlap').length).toBeGreaterThan(0);
+  });
+
   it('encodes the domain-search example and reports malformed hexadecimal data', async () => {
     const user = userEvent.setup();
     renderAt('#/tool/options');
@@ -305,12 +326,49 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByText('Value contains non-hexadecimal characters.')).toBeVisible();
   });
 
-  it('warns about mixed PXE architectures and labels generated snippets review-only', async () => {
+  it('validates a type-aware editable option set for duplicates and timing relationships', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/options');
+    expect(screen.getByRole('spinbutton', { name: 'Option 2 value' })).toHaveAttribute('type', 'number');
+    const secondCode = screen.getByRole('spinbutton', { name: 'Option 2 code' });
+    await user.clear(secondCode);
+    await user.type(secondCode, '51');
+    expect(screen.getAllByText('Option 51 cannot be repeated.').length).toBeGreaterThan(0);
+
+    await user.clear(secondCode);
+    await user.type(secondCode, '58');
+    const secondValue = screen.getByRole('spinbutton', { name: 'Option 2 value' });
+    await user.clear(secondValue);
+    await user.type(secondValue, '80000');
+    expect(screen.getAllByText('T1 must be less than T2.').length).toBeGreaterThan(0);
+  });
+
+  it('derives PXE architecture results from visible selections before warning about a mixed global file', async () => {
     const user = userEvent.setup();
     renderAt('#/tool/pxe');
+    expect(screen.queryByText(/single global boot file cannot safely represent mixed firmware architectures/i)).not.toBeInTheDocument();
+    expect(screen.getByText('7, 9')).toBeVisible();
+    await user.click(screen.getByRole('checkbox', { name: 'BIOS x86' }));
     await user.click(screen.getByRole('checkbox', { name: 'Use one global boot file for mixed architectures' }));
-    expect(screen.getByText(/single global boot file cannot safely represent mixed firmware architectures/i)).toBeVisible();
+    expect(screen.getAllByText(/single global boot file cannot safely represent mixed firmware architectures/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/REVIEW ONLY/).length).toBeGreaterThan(0);
+  });
+
+  it('redacts opaque PXE field values from the downloaded report', async () => {
+    const user = userEvent.setup();
+    const opaque = 'PXE_PRIVATE_Q7Z_VALUE';
+    let reportBlob: Blob | undefined;
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob: Blob) => { reportBlob = blob; return 'blob:pxe-report'; }) });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderAt('#/tool/pxe');
+    const server = screen.getByRole('textbox', { name: 'Boot server' });
+    await user.clear(server);
+    await user.type(server, opaque);
+    await user.click(screen.getByRole('button', { name: 'Download report' }));
+
+    expect(reportBlob).toBeDefined();
+    expect(await readBlob(reportBlob!)).not.toContain(opaque);
   });
 
   it('marks failover no-go when TCP port 647 is blocked', async () => {
@@ -319,6 +377,24 @@ describe('DHCPulse Workbench', () => {
     await user.click(screen.getByRole('checkbox', { name: 'TCP port 647 allowed between partners' }));
     expect(screen.getByText('No-go')).toBeVisible();
     expect(screen.getAllByText(/TCP 647/i).length).toBeGreaterThan(0);
+  });
+
+  it('associates failover and DHCPv6 numeric blockers with their controls', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/failover');
+    const mclt = screen.getByRole('spinbutton', { name: 'MCLT (minutes)' });
+    await user.clear(mclt);
+    await user.type(mclt, '-1');
+    expect(mclt).toHaveAttribute('aria-invalid', 'true');
+    expect(mclt).toHaveAccessibleDescription(/nonnegative safe integer/i);
+
+    window.location.hash = '#/tool/dhcpv6';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    const prefix = screen.getByRole('spinbutton', { name: 'Delegated pool prefix' });
+    await user.clear(prefix);
+    await user.type(prefix, '129');
+    expect(prefix).toHaveAttribute('aria-invalid', 'true');
+    expect(prefix).toHaveAccessibleDescription(/0 through 128/i);
   });
 
   it('shows 256 delegated /64 prefixes for a /56 DHCPv6 pool', () => {
@@ -375,6 +451,74 @@ describe('DHCPulse Workbench', () => {
     expect(text).not.toHaveBeenCalled();
   });
 
+  it('does not restore analyzer state after Reset while File.text is pending', async () => {
+    const user = userEvent.setup();
+    const pending = deferred<string>();
+    const fixture = '{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24"}]}}';
+    const file = new File(['ignored'], 'pending-sensitive.json');
+    Object.defineProperty(file, 'text', { configurable: true, value: vi.fn(() => pending.promise) });
+    renderAt('#/tool/config-analyzer');
+
+    fireEvent.change(screen.getByLabelText('Local configuration file'), { target: { files: [file] } });
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await act(async () => pending.resolve(fixture));
+
+    expect(screen.queryByText('pending-sensitive.json')).not.toBeInTheDocument();
+    expect(screen.queryByText('ISC Kea')).not.toBeInTheDocument();
+  });
+
+  it('opens analyzer and comparison with synthetic presets and authoritative format sources', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/config-analyzer');
+    expect(screen.getByRole('textbox', { name: 'Configuration text' })).not.toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Analyze configuration' }));
+    expect(screen.getByRole('link', { name: 'Kea Administrator Reference Manual' })).toBeVisible();
+
+    window.location.hash = '#/tool/config-diff';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    expect(screen.getByRole('textbox', { name: 'Source configuration' })).not.toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Target configuration' })).not.toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Compare configurations' }));
+    expect(screen.getByText('Total changes')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'ISC DHCP configuration reference' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Kea migration guidance' })).toBeVisible();
+    const visibleChanges = screen.getAllByRole('listitem').filter((item) => item.closest('.change-list'));
+    const impacts = visibleChanges.map((item) => item.getAttribute('data-impact'));
+    const impactRanks: Record<string, number> = { blocker: 0, warning: 1, info: 2 };
+    expect(impacts).toEqual([...impacts].sort((a, b) => impactRanks[a!]! - impactRanks[b!]!));
+  });
+
+  it('does not restore either comparison side after Reset while file reads are pending', async () => {
+    const user = userEvent.setup();
+    const sourcePending = deferred<string>();
+    const targetPending = deferred<string>();
+    const fixture = '{"Dhcp4":{"subnet4":[{"subnet":"192.0.2.0/24"}]}}';
+    const source = new File(['ignored'], 'pending-source.json');
+    const target = new File(['ignored'], 'pending-target.json');
+    Object.defineProperty(source, 'text', { configurable: true, value: vi.fn(() => sourcePending.promise) });
+    Object.defineProperty(target, 'text', { configurable: true, value: vi.fn(() => targetPending.promise) });
+    renderAt('#/tool/config-diff');
+
+    fireEvent.change(screen.getByLabelText('Source local file'), { target: { files: [source] } });
+    fireEvent.change(screen.getByLabelText('Target local file'), { target: { files: [target] } });
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await act(async () => { sourcePending.resolve(fixture); targetPending.resolve(fixture); });
+
+    expect(screen.queryByText('pending-source.json')).not.toBeInTheDocument();
+    expect(screen.queryByText('pending-target.json')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\u2713 ISC Kea/)).not.toBeInTheDocument();
+  });
+
+  it('links comparison file errors to the responsible file control', () => {
+    renderAt('#/tool/config-diff');
+    const file = new File(['small'], 'oversized-source.conf');
+    Object.defineProperty(file, 'size', { configurable: true, value: 2 * 1024 * 1024 + 1 });
+    const input = screen.getByLabelText('Source local file');
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription('Files must be 2 MiB or smaller.');
+  });
+
   it('compares configurations and filters added and changed entries', async () => {
     const user = userEvent.setup();
     renderAt('#/tool/config-diff');
@@ -388,7 +532,7 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getAllByText('Changed').length).toBeGreaterThan(0);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Change kind' }), 'added');
     expect(screen.getAllByText('Added').length).toBeGreaterThan(0);
-    expect(screen.queryAllByText('Changed').filter((element) => element.tagName !== 'OPTION')).toHaveLength(0);
+    expect(within(document.querySelector('.change-list')!).queryByText('Changed')).not.toBeInTheDocument();
     await user.selectOptions(screen.getByRole('combobox', { name: 'Change kind' }), 'removed');
     expect(screen.queryAllByText('Removed').filter((element) => element.tagName !== 'OPTION').length).toBeGreaterThan(0);
   });
@@ -416,6 +560,34 @@ describe('DHCPulse Workbench', () => {
     expect(document.body).not.toHaveTextContent(/workbench\.[a-z]/i);
   });
 
+  it('presents domain-derived diagnostics and report privacy copy in German', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/diagnostics');
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByText('Relay-Pfad oder Server nicht erreichbar')).toBeVisible();
+    expect(screen.queryByText('Relay path or server reachability failure')).not.toBeInTheDocument();
+    const checks = screen.getByRole('heading', { name: 'Geordnete Nachweispr\u00fcfungen' }).closest('section')!;
+    expect(within(checks).getAllByRole('link', { name: /Quelle f\u00fcr Pr\u00fcfung/ }).length).toBeGreaterThan(0);
+  });
+
+  it('localizes domain-derived failover, DHCPv6, and security results in German', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/failover');
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByText('Windows-DHCP-Failover gilt nur für IPv4-Scopes.')).toBeVisible();
+    expect(screen.queryByText('Windows DHCP failover supports IPv4 scopes only.')).not.toBeInTheDocument();
+
+    window.location.hash = '#/tool/dhcpv6';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    expect(screen.getByText('Router Advertisements liefern die IPv6-Standardroute; DHCPv6 nicht.')).toBeVisible();
+    expect(screen.queryByText(/Router Advertisements supply the IPv6 default route/i)).not.toBeInTheDocument();
+
+    window.location.hash = '#/tool/security';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    expect(screen.getByText('DHCP Snooping ist deaktiviert')).toBeVisible();
+    expect(screen.queryByText('DHCP snooping is disabled')).not.toBeInTheDocument();
+  });
+
   it('localizes Header landmark labels and polished German catalog copy', async () => {
     const user = userEvent.setup();
     renderAt();
@@ -427,3 +599,12 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('link', { name: /Konfigurationsanalyse/ })).toHaveTextContent('DHCP-Konfiguration auf typische Risiken prüfen.');
   });
 });
+
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blob);
+  });
+}

@@ -22,6 +22,7 @@ export interface WorkbenchReportInput {
   assumptions: string[];
   sources: WorkbenchReportSource[];
   sensitiveValues?: string[];
+  locale?: 'en' | 'de';
 }
 
 export interface WorkbenchReport {
@@ -30,9 +31,27 @@ export interface WorkbenchReport {
 }
 
 const severityRank: Record<WorkbenchFindingSeverity, number> = { blocker: 0, warning: 1, info: 2 };
-const privacyNote = 'Processed locally; no data was uploaded. Imported identifiers are redacted by default.';
+const reportCopy = {
+  en: {
+    toolId: 'Tool ID', generatedAt: 'Generated at', redaction: 'Redaction', enabled: 'enabled',
+    inputs: 'Input summary', findings: 'Findings', assumptions: 'Assumptions and limitations',
+    sources: 'Authoritative sources', privacy: 'Privacy', noneInputs: 'No input summary.',
+    noneFindings: 'No findings.', noneAssumptions: 'None stated.',
+    severities: { blocker: 'BLOCKER', warning: 'WARNING', info: 'INFO' },
+    privacyNote: 'Processed locally; no data was uploaded. Imported identifiers are redacted by default.',
+  },
+  de: {
+    toolId: 'Tool-ID', generatedAt: 'Erstellt am', redaction: 'Redaktion', enabled: 'aktiviert',
+    inputs: 'Eingabezusammenfassung', findings: 'Hinweise', assumptions: 'Annahmen und Grenzen',
+    sources: 'Maßgebliche Quellen', privacy: 'Datenschutz', noneInputs: 'Keine Eingabezusammenfassung.',
+    noneFindings: 'Keine Hinweise.', noneAssumptions: 'Keine angegeben.',
+    severities: { blocker: 'BLOCKER', warning: 'WARNUNG', info: 'HINWEIS' },
+    privacyNote: 'Lokal verarbeitet; es wurden keine Daten hochgeladen. Importierte Identifikatoren werden standardmäßig redigiert.',
+  },
+} as const;
 
 export function buildWorkbenchReport(input: WorkbenchReportInput): WorkbenchReport {
+  const copy = reportCopy[input.locale ?? 'en'];
   const redactor = createRedactor(`workbench:${input.toolId}`);
   const sensitiveValues = [...new Set(input.sensitiveValues?.filter(Boolean) ?? [])]
     .sort((left, right) => right.length - left.length);
@@ -60,37 +79,37 @@ export function buildWorkbenchReport(input: WorkbenchReportInput): WorkbenchRepo
     findings: safeFindings,
     assumptions,
     sources,
-    privacy: privacyNote,
+    privacy: copy.privacyNote,
     redaction: 'enabled',
   });
   const markdown = [
     `# ${input.toolName}`,
     '',
-    `Tool ID: ${input.toolId}`,
-    `Generated at: ${input.generatedAt}`,
-    'Redaction: enabled',
+    `${copy.toolId}: ${input.toolId}`,
+    `${copy.generatedAt}: ${input.generatedAt}`,
+    `${copy.redaction}: ${copy.enabled}`,
     '',
-    '## Input summary',
+    `## ${copy.inputs}`,
     '',
-    ...markdownRecord(safeInputs),
+    ...markdownRecord(safeInputs, copy.noneInputs),
     '',
-    '## Findings',
+    `## ${copy.findings}`,
     '',
     ...(safeFindings.length > 0
-      ? safeFindings.map((finding) => `- [${finding.severity.toUpperCase()}] ${finding.title}${finding.detail ? ` - ${finding.detail}` : ''}`)
-      : ['- No findings.']),
+      ? safeFindings.map((finding) => `- [${copy.severities[finding.severity]}] ${finding.title}${finding.detail ? ` - ${finding.detail}` : ''}`)
+      : [`- ${copy.noneFindings}`]),
     '',
-    '## Assumptions and limitations',
+    `## ${copy.assumptions}`,
     '',
-    ...(assumptions.length > 0 ? assumptions.map((item) => `- ${item}`) : ['- None stated.']),
+    ...(assumptions.length > 0 ? assumptions.map((item) => `- ${item}`) : [`- ${copy.noneAssumptions}`]),
     '',
-    '## Authoritative sources',
+    `## ${copy.sources}`,
     '',
     ...sources.map((source) => `- [${source.label}](${source.url})`),
     '',
-    '## Privacy',
+    `## ${copy.privacy}`,
     '',
-    privacyNote,
+    copy.privacyNote,
     '',
   ].join('\n');
   return { markdown, json: JSON.stringify(payload, null, 2) };
@@ -129,9 +148,9 @@ function sortValue(value: unknown): unknown {
   return value;
 }
 
-function markdownRecord(value: Record<string, unknown>): string[] {
+function markdownRecord(value: Record<string, unknown>, emptyMessage: string): string[] {
   const entries = Object.entries(value);
-  if (entries.length === 0) return ['- No input summary.'];
+  if (entries.length === 0) return [`- ${emptyMessage}`];
   return entries.map(([key, entry]) => `- ${key}: ${formatValue(entry)}`);
 }
 

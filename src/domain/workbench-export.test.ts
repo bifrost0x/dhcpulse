@@ -30,6 +30,32 @@ describe('buildWorkbenchReport', () => {
     expect(first.json).not.toContain('lab-sensitive.example.test');
   });
 
+  it('redacts opaque caller-designated values from every output field', () => {
+    const opaque = 'PXE_CLASS_Q7Z-private-value';
+    const report = buildWorkbenchReport({
+      ...reportInput,
+      inputs: { vendorClass: opaque, nested: { bootServer: opaque } },
+      findings: [{ severity: 'warning', title: `Review ${opaque}`, detail: opaque }],
+      assumptions: [`Do not expose ${opaque}`],
+      sensitiveValues: [opaque],
+    });
+
+    expect(report.markdown).not.toContain(opaque);
+    expect(report.json).not.toContain(opaque);
+    expect(report.markdown).toContain('[redacted]');
+  });
+
+  it('localizes report headings and the privacy declaration in German', () => {
+    const report = buildWorkbenchReport({ ...reportInput, locale: 'de' });
+
+    expect(report.markdown).toContain('## Eingabezusammenfassung');
+    expect(report.markdown).toContain('## Datenschutz');
+    expect(report.markdown).toContain('Lokal verarbeitet; es wurden keine Daten hochgeladen.');
+    expect(report.markdown).toContain('[WARNUNG]');
+    expect(report.markdown).not.toContain('[WARNING]');
+    expect(JSON.parse(report.json).privacy).toContain('keine Daten hochgeladen');
+  });
+
   it('creates, clicks, and immediately revokes one object URL', () => {
     const createObjectURL = vi.fn(() => 'blob:workbench-report');
     const revokeObjectURL = vi.fn();
