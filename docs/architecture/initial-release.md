@@ -1,131 +1,62 @@
-# DHCPulse initial release design
+# DHCPulse workbench architecture
 
-## Product purpose
+## Release shape
 
-DHCPulse is a privacy-first planning tool for DHCP migrations and configuration changes. It turns lease timing, server topology, relay changes, and lease-database decisions into an understandable cutover timeline, risk assessment, and operational checklist.
+DHCPulse is a static React and TypeScript single-page application built with Vite. A hash-based workbench shell presents ten implemented tools without a router dependency or backend. English and German interface copy is bundled with the application.
 
-The initial release targets Microsoft administrators, security consultants, small organizations, and homelab operators. It is useful without an account, backend, network scan, uploaded configuration file, or telemetry.
+The release covers scope and capacity planning, lease transitions, DHCP options, PXE, Windows DHCP failover, DHCPv6, diagnostics, DHCP security, configuration analysis, and semantic configuration comparison. It does not provide DHCP service, IPAM/DDI, live monitoring, active discovery, packet generation, or vendor validation.
 
-## Product promise
+## Modular tool shell
 
-A user can describe a DHCP change in a few minutes and answer four practical questions:
+`src/components/WorkbenchShell.tsx` owns hash routing, catalog and tool selection, focus movement, locale propagation, and per-tool reset keys. `src/content/tool-catalog.ts` is the authoritative registry for the ten tool IDs, groups, localized names, and descriptions. Each module under `src/tools/` adapts form state to a domain engine and renders results, assumptions, source links, and local report actions.
 
-1. When will existing clients try their original server, rebind to any available server, and finally lose their lease?
-2. Is the proposed cutover safe enough to proceed?
-3. Which preparation, cutover, validation, and rollback actions apply to this topology?
-4. What assumptions and residual risks must be communicated in the change record?
+The shell does not share scenario or import state between tools. Reset remounts the active tool; returning to the catalog unmounts it. This keeps the state lifetime bounded to the current tab and active tool.
 
-DHCPulse is a planning model, not a packet-level emulator and not a guarantee of vendor-specific client behavior.
+## Domain engines
 
-## Privacy and safety boundary
+The calculators and assessment engines under `src/domain/` are deterministic functions with typed inputs and outputs. They cover IPv4 capacity, lease timing, option handling, PXE decisions, failover, DHCPv6, diagnostics, security rules, semantic comparison, and redaction. UI components do not reproduce those decision rules.
 
-- All calculations run locally in the browser.
-- The application has no API, database, authentication, analytics, cookies, file upload, or outbound application request.
-- Inputs describe a scenario and should not require hostnames, addresses, client identifiers, or production configuration files.
-- The generated Markdown plan is created locally and downloaded by the browser.
-- A restrictive Content Security Policy prevents connections to external services in the production build.
+Most domain engines are pure and independent of React and the DOM. Browser-specific edges are explicit: the Microsoft XML adapter uses `DOMParser`, and download helpers use `Blob` and temporary object URLs. File selection and `File.text()` remain in the tool components.
 
-## Core workflow
+## Canonical configuration and adapters
 
-The interface is a single-page planning workspace with five compact sections:
+`src/domain/config-model.ts` defines the canonical `DhcpConfiguration` model. It represents servers, DHCPv4 and DHCPv6 scopes, pools, exclusions, reservations, options and inheritance level, policies and classes, relays, failover relationships, DNS update settings, audit settings, provenance, and parser warnings.
 
-1. **Scenario** - choose migration, server-address change, lease-duration change, DNS-option change, or emergency replacement.
-2. **Lease timing** - enter current lease duration and optionally override RFC-style T1 and T2 percentages. Defaults are 50% and 87.5%.
-3. **Topology** - describe server address continuity, relay usage and update state, lease transfer, pool overlap, and coexistence.
-4. **Client profile** - estimate client count and the share of clients likely to be offline during cutover.
-5. **Results** - receive a verdict, lease-event timeline, client-wave estimates, risk findings, phased checklist, rollback guidance, and Markdown export.
+Four adapters normalize Microsoft DHCP XML, Kea JSON, ISC dhcpd, and dnsmasq input into that model. Detection is content- and file-name-based. Inputs are capped at 2 MiB; XML entity declarations are rejected; structured Kea and ISC inputs have additional complexity bounds. Every adapter is a bounded analysis subset. Unsupported syntax is omitted and surfaced through parser warnings where detected.
 
-Inputs update results immediately. Presets provide realistic examples and double as an onboarding path.
+The analyzer summarizes canonical entities and selected observations. The comparison engine matches normalized entities by semantic identity, classifies additions, removals, and changes, assigns migration impact, and redacts values before returning displayable change records.
 
-## Calculation model
+## Report and redaction path
 
-### Lease events
+Tool inputs and findings flow through `buildWorkbenchReport`. The report builder produces deterministic Markdown and JSON structures, sorts findings and sources, replaces configured sensitive values, scrubs string-valued input summaries, and applies pattern-based redaction. The analyzer report contains counts and observations rather than the raw imported model; configuration comparison exposes redacted semantic changes.
 
-For a lease duration `L` and optional timing fractions `t1` and `t2`:
+Downloads use an in-memory `Blob`. A temporary object URL is created for the browser download and revoked immediately. Reports from imported configurations are redacted by default, but redaction is not guaranteed to recognize every vendor-specific or encoded secret.
 
-- renewal starts at `L * t1` after the last successful lease acquisition;
-- rebinding starts at `L * t2`;
-- expiry occurs at `L`.
+## Trust boundaries
 
-When only an aggregate client count is available, the model assumes online clients are healthy before cutover and evenly distributed across their T1 renewal cycle. Renewal attempts can therefore begin at cutover and complete within T1. If the original server stops answering, rebinding can begin after `T2 - T1` and complete within T2; expiry can begin after `L - T1` and complete within `L`. The tool reports these cutover-relative windows instead of pretending to know each endpoint's exact lease age. Clients already experiencing renewal failures before cutover are outside this aggregate model.
+```text
+Untrusted pasted text or local file
+  -> browser File API and size check
+  -> format detection and bounded adapter
+  -> canonical configuration in tab memory
+  -> analyzer or redacted semantic comparison
+  -> redacted report builder
+  -> local Blob download
+```
 
-### Cutover consequences
+The source text and canonical configuration remain inside the current browser tab. No application endpoint, persistence layer, service worker, analytics service, or telemetry client exists. Production HTML sets `connect-src 'none'`, and the build verifier rejects compiled network primitives. External documentation requests occur only after a user follows a link. Static hosts remain outside the application trust boundary and can observe ordinary asset requests.
 
-- With the same service address and imported leases, renewal can continue after the replacement service is ready.
-- With a new service address, clients may first unicast to the old server and generally need rebinding or a fresh DHCP exchange to discover the replacement.
-- Without imported leases, reusing the same address pool can create duplicate-allocation risk until old leases expire. A non-overlapping temporary pool lowers collision risk but still requires capacity.
-- Relayed networks depend on IP-helper or relay targets reaching the new service.
-- Running both servers with overlapping authoritative pools is a blocking condition unless a deliberately coordinated split-scope design is selected in a future version.
-- A shorter configured lease affects new and renewed leases; it does not retroactively shorten already-issued leases.
-- Offline clients can return with an old address request and remain a residual risk after the visible cutover window.
+## Deployment controls
 
-### Verdicts
+Vite emits relative asset paths for root or subpath static hosting. The container build uses digest-pinned Node and unprivileged nginx images. The included Compose service runs with a read-only root filesystem, temporary writable mounts, dropped Linux capabilities, and `no-new-privileges`. `nginx.conf` adds CSP, framing, referrer, content-type, cross-origin, and permissions headers.
 
-The engine returns one of three operational states:
+Operators who change the build, proxy, CDN, or host must re-establish the privacy and CSP properties documented in `PRIVACY.md`.
 
-- **No-go** - a blocking topology or collision condition is present.
-- **Caution** - the change can be planned, but one or more time-dependent or operational risks remain.
-- **Ready** - the described topology contains no known blocking condition and the generated checklist covers the remaining validation work.
+## Test strategy
 
-Every verdict includes reasons and never hides assumptions behind a single score.
-
-## Architecture
-
-The application is a static React and TypeScript site built with Vite.
-
-- `src/domain` contains pure, deterministic scenario validation, lease calculations, risk rules, checklist generation, and Markdown export.
-- `src/components` contains presentation-focused UI components with semantic HTML and accessible controls.
-- `src/content` contains bilingual interface copy and preset scenarios.
-- `src/App.tsx` owns user-editable scenario state and composes the workflow.
-- No domain module accesses the DOM, browser storage, time, or network.
-
-This separation makes the planning rules independently testable and keeps hosting possible on GitHub Pages or any static web server.
-
-## User experience and visual direction
-
-The visual identity uses a dark, calm operations-console aesthetic without imitating a terminal. A restrained cyan signal color, warm warning colors, high-contrast typography, fine grid texture, and generous spacing communicate precision without visual noise.
-
-The results remain visible beside the form on wide screens and follow the form on narrow screens. The timeline is built from semantic HTML and CSS rather than canvas so it stays responsive and accessible. Motion respects `prefers-reduced-motion`.
-
-English is the default language, with complete German copy available from the header. User input is preserved when switching languages.
-
-## Error handling
-
-- Numeric inputs have explicit bounds and inline messages.
-- T1 must be greater than zero and less than T2; T2 must be below 100%.
-- Results are withheld when the timing model is invalid.
-- Clipboard failures fall back to a downloadable Markdown file.
-- Empty or unsupported browser capabilities do not prevent the core calculation.
-
-## Testing strategy
-
-- Unit tests cover lease event mathematics, uniform client-wave estimates, validation boundaries, verdict rules, risk ordering, checklist composition, and Markdown escaping/content.
-- Component tests cover presets, language switching, invalid input handling, result rendering, and export actions using real components.
-- Production verification includes type checking, linting, unit/component tests, a clean production build, preview-server browser checks at desktop and mobile widths, keyboard navigation, console inspection, and an accessibility scan.
-
-## Initial-release scope
-
-Included:
-
-- Five scenario types and four curated presets
-- Aggregate lease-wave estimation
-- Server address, relay, lease transfer, pool overlap, coexistence, and offline-client factors
-- Explainable verdict and findings
-- Phase-based operational checklist and rollback guidance
-- English and German interface
-- Local Markdown download and clipboard copy
-- Static hosting configuration, Docker image, security headers guidance, contributor documentation, and MIT license
-
-Excluded:
-
-- Configuration-file parsing or uploads
-- Per-client lease-database imports
-- IPv6 DHCPv6 planning
-- Split-scope and failover protocol modelling
-- Active network discovery, DNS lookup, port scanning, or server connectivity tests
-- Vendor command generation
-- Accounts, saved projects, shared links, telemetry, or cloud persistence
-
-## Success criteria
-
-The release is complete when a first-time user can load a preset or describe a scenario, understand the verdict and lease timeline without DHCP protocol expertise, export a credible change-plan draft, and verify from the repository that the hosted application sends no scenario data anywhere.
+- Domain unit tests cover calculations, validation boundaries, parser fixtures and rejection cases, normalization, comparison impacts, deterministic IDs, redaction, and report serialization.
+- React component tests run in Vitest with jsdom and exercise the real workbench shell, navigation, reset behavior, forms, imports, results, and downloads.
+- TypeScript project builds and ESLint provide static checks.
+- Repository policy tests reject forbidden tracked paths, mutable GitHub Action references, and unpinned Docker base images.
+- The production build verifier checks the CSP, relative asset paths, emitted JavaScript presence, and absence of fetch, XHR, WebSocket, EventSource, and beacon primitives.
+- Manual browser, accessibility, and deployment checks remain release-operator responsibilities and are not implied by automated results.

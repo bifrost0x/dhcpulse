@@ -1,55 +1,50 @@
 # DHCPulse
 
-**Know the lease wave before the change window.**
+DHCPulse is a static, local-only DHCP workbench for planning address pools and lease changes, preparing options and PXE settings, reviewing failover and DHCPv6 designs, troubleshooting symptoms, checking security controls, and comparing vendor configurations before a change window.
 
-DHCPulse is an open-source, privacy-first planner for DHCP migrations and configuration changes. Describe the lease timing and topology, then get an explainable go/no-go assessment, client-wave timeline, cutover checklist, rollback guidance, and a locally generated Markdown change plan.
+It is useful when you need an explainable second opinion without sending production configuration to an application backend. DHCPulse is not a DHCP server, IPAM/DDI system, live monitor, active scanner, packet generator, or substitute for vendor validation and lab testing.
 
-It is built for Microsoft administrators, security consultants, small organizations, and homelab operators who need a credible change plan without uploading production configuration.
+## Implemented tools
 
-## Why DHCPulse exists
+| Tool | Practical use |
+| --- | --- |
+| Scope and capacity | Design IPv4 pools, exclusions, reservations, and capacity margins. |
+| Lease transition | Model T1, T2, expiry, client waves, cutover risks, and rollback steps. |
+| DHCP options | Find, encode, decode, and validate common DHCPv4 and DHCPv6 options. |
+| PXE boot | Review architecture matching, boot settings, ProxyDHCP risks, and vendor-specific example snippets. |
+| Failover design | Assess Windows DHCP failover mode, timers, capacity, readiness, and validation steps. |
+| DHCPv6 | Review RA flags, address and prefix lifetimes, relay evidence, DUID/IAID assumptions, and delegated-prefix capacity. |
+| Diagnostics | Rank likely causes from entered symptoms and evidence, then provide targeted checks and sources. |
+| DHCP security | Review control evidence for infrastructure, service, network, and operational safeguards. |
+| Configuration analyzer | Import a supported configuration locally and summarize scopes, pools, reservations, options, parser warnings, and selected migration or security observations. |
+| Configuration comparison | Normalize two supported configurations and report redacted semantic additions, removals, changes, and migration impacts. |
 
-DHCP changes often look simple until existing leases, T1/T2 timing, a new server address, routed segments, or overlapping address pools enter the picture. Vendor migration guides explain platform steps, but they do not turn a specific topology into a client-facing time window and operational risk assessment.
+All tools run in the browser. Reports are assembled locally and downloaded through a temporary object URL. Imported-configuration reports are redacted by default.
 
-DHCPulse answers:
+## Configuration imports
 
-- How many clients are expected to attempt renewal in the first hour, and when can rebinding or expiry begin?
-- When can every currently valid lease have reached T1, T2, and expiry?
-- Does this topology create duplicate-allocation or reachability risk?
-- Which preparation, validation, and rollback steps apply to this change?
+The analyzer and comparison tools accept pasted text or local files in these formats:
 
-## Privacy by architecture
+- Microsoft DHCP Server XML exports
+- Kea JSON, including the supported comment forms
+- ISC `dhcpd.conf`
+- dnsmasq DHCP directives
 
-DHCPulse is a static web application.
+Auto-detection uses recognizable content and selected file-name extensions. Each file or pasted input is limited to 2 MiB of UTF-8 data. Microsoft XML containing `DOCTYPE` or `ENTITY` declarations is rejected.
 
-- No backend or API
-- No accounts, cookies, analytics, telemetry, or browser storage
-- No configuration or lease-file uploads
-- No hostnames, addresses, client identifiers, or secrets required
-- No application network requests; production CSP uses `connect-src 'none'`
-- Markdown plans are generated and downloaded locally
+The adapters intentionally parse a bounded analysis subset. Unsupported elements, keys, directives, statements, and expression-language details can be omitted and are reported as parser warnings where detected. They do not execute includes, expand every vendor extension, reproduce configuration precedence in full, or guarantee complete schema fidelity. Always compare findings with the source configuration and vendor tooling.
 
-See [PRIVACY.md](PRIVACY.md) for the complete boundary.
+Configuration files can contain sensitive infrastructure data, including addresses, hostnames, client identifiers, topology labels, audit paths, and embedded option values. Local processing prevents application uploads, but it does not make that data non-sensitive. Use a trusted browser and host, keep downloaded reports under appropriate access control, and inspect redaction before sharing.
 
-## Planning model
+Use **Reset** to restore the current tool's synthetic defaults and clear its current in-memory state. Leaving a tool or reloading or closing the tab also discards application state. DHCPulse does not persist projects or imports.
 
-The default lease model uses the common DHCPv4 timing defined by [RFC 2131](https://www.rfc-editor.org/rfc/rfc2131.html):
+## Privacy and security boundary
 
-- T1 renewal at 50% of the lease lifetime
-- T2 rebinding at 87.5%
-- Expiry at 100%
+DHCPulse is a static application with no application backend, accounts, storage, analytics, telemetry, or application network connections. Scenario and imported configuration data stay in the current browser tab. The production Content Security Policy sets `connect-src 'none'`.
 
-Both timing percentages are editable because servers may supply different values. When only a total client estimate is available, DHCPulse assumes online clients are healthy before cutover and evenly distributed across their T1 renewal cycle. It derives the earliest and latest renewal, rebinding, and expiry windows after cutover and clearly labels every client count as an estimate.
+External documentation and source links open only after the user activates them. A hosting provider can still process ordinary web-server request metadata. Read [PRIVACY.md](PRIVACY.md) for the exact data boundary and [SECURITY.md](SECURITY.md) for the parser threat model and disclosure process.
 
-Important limitations:
-
-- A shorter configured lease does not retroactively shorten leases already issued.
-- Client and server implementations can differ from the default model.
-- DHCPulse is a planning aid, not a packet emulator, live validation tool, or substitute for vendor documentation and a tested rollback.
-- The initial release models DHCPv4 only. DHCPv6, failover protocols, split-scope designs, and lease-file parsing are outside the current scope.
-
-The full design is documented in [docs/architecture/initial-release.md](docs/architecture/initial-release.md).
-
-## Run locally
+## Local development
 
 Requirements: Node.js 22.13 or newer.
 
@@ -60,53 +55,51 @@ npm run dev
 
 Open the local URL printed by Vite.
 
-## Verify
+## Testing
 
 ```bash
 npm run check:repo
-npm run audit:dependencies
+npm audit --audit-level=high
 npm run lint
 npm run typecheck
 npm test
-npm run test:coverage
 npm run build
 ```
 
-## Deploy
+The build step also checks the production CSP and rejects JavaScript assets containing fetch, XHR, WebSocket, EventSource, or beacon primitives.
 
-### Static hosting
+## Run with Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+The container runs unprivileged on port 8080 with a read-only root filesystem, dropped capabilities, `no-new-privileges`, and restrictive response headers. Set `DHCPULSE_PORT` to publish a different host port.
+
+## Static hosting
 
 ```bash
 npm ci
 npm run build
 ```
 
-Publish the contents of `dist/`. Relative asset paths allow deployment at a domain root or repository subpath.
+Publish the contents of `dist/`. Relative asset paths support a domain root or repository subpath. Preserve the CSP and other security headers when configuring the host; see [PRIVACY.md](PRIVACY.md) before changing the build or hosting model.
 
-The included GitHub Pages workflow can be started manually after Pages is configured to use GitHub Actions.
+## Authoritative references
 
-### Docker
+DHCPulse links findings to the relevant source in each tool. Core references include:
 
-```bash
-docker build -t dhcpulse .
-docker run --rm -p 8080:8080 dhcpulse
-```
-
-The final image runs unprivileged on port 8080 and serves restrictive security headers from [nginx.conf](nginx.conf).
-
-For a persistent, read-only deployment with automatic restart:
-
-```bash
-docker compose up -d --build
-```
-
-Set `DHCPULSE_PORT` to publish a different host port.
+- [RFC 2131 - Dynamic Host Configuration Protocol](https://www.rfc-editor.org/rfc/rfc2131.html)
+- [IANA BOOTP/DHCP Parameters](https://www.iana.org/assignments/bootp-dhcp-parameters/)
+- [RFC 9915 - Dynamic Host Configuration Protocol for IPv6](https://www.rfc-editor.org/rfc/rfc9915.html)
+- [Microsoft DHCP documentation](https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-top)
+- [Kea Administrator Reference Manual](https://kea.readthedocs.io/en/latest/arm/config.html)
+- [ISC DHCP configuration reference](https://kb.isc.org/docs/isc-dhcp-44-manual-pages-dhcpdconf)
+- [dnsmasq manual](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)
 
 ## Contributing
 
-Bug reports, validated DHCP edge cases, translations, accessibility improvements, and focused risk rules are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change. Security concerns belong in the private process described in [SECURITY.md](SECURITY.md).
-
-General usage questions belong in GitHub Discussions. See [SUPPORT.md](SUPPORT.md) for the support boundaries and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a focused change. Report security concerns through the private process in [SECURITY.md](SECURITY.md). Usage questions belong in GitHub Discussions; [SUPPORT.md](SUPPORT.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) describe the project boundaries.
 
 ## License
 

@@ -1,28 +1,44 @@
 # Privacy
 
-DHCPulse is designed so that a hosted instance does not need to receive scenario data.
+DHCPulse is designed as a static, local-only application. It has no application backend and does not upload scenario data or imported configuration files.
 
-## Data processing
+## What the browser processes
 
-All scenario state and calculations exist only in the current browser tab. DHCPulse does not implement:
+Interactive values are held in JavaScript memory in the current browser tab. The configuration analyzer and comparison tools access a user-selected file through the browser File API and read its text in browser memory. After a successful import, the raw text is removed from application state; the normalized configuration remains in volatile memory while the tool is open so the analysis or comparison can be displayed.
 
-- a server-side API or database;
-- user accounts or authentication;
-- cookies, local storage, or session storage;
+Reports are redacted by default when they originate from imported configurations. Redaction is a sharing safeguard, not a guarantee that every possible vendor-specific secret or identifier will be recognized. Review every report before sharing it.
+
+Downloads are created from an in-memory `Blob`. DHCPulse creates a temporary object URL, activates the browser download, and revokes the object URL immediately afterward. The browser and operating system control the resulting downloaded file.
+
+Resetting a tool restores its synthetic defaults and clears its current application state. Navigating away from a tool, reloading, or closing the tab discards that state. DHCPulse implements no cookies, local storage, session storage, IndexedDB, service worker cache, account, database, or cloud persistence.
+
+## What DHCPulse does not do
+
+The application does not implement:
+
+- file or configuration upload;
 - analytics, telemetry, advertising, or error-reporting services;
-- file or configuration uploads;
-- active network, DNS, DHCP, or connectivity checks.
+- active network, DNS, DHCP, server, or connectivity checks;
+- application API calls or other application network connections.
 
-The application does not ask for production hostnames, IP addresses, MAC addresses, client identifiers, or secrets. A Markdown plan is assembled in browser memory and either copied through the browser clipboard permission or downloaded as a local file.
+The production HTML sets a Content Security Policy with `connect-src 'none'`. The build verification also rejects compiled JavaScript containing fetch, XHR, WebSocket, EventSource, or beacon primitives.
 
-The production Content Security Policy sets `connect-src 'none'`, preventing application scripts from opening network connections even if a future regression attempted one.
+External documentation and source links open only after a user activates them. Those sites then apply their own privacy policies.
+
+## Sensitive configuration data
+
+DHCP configuration can contain addresses, hostnames, MAC addresses, DUIDs, client identifiers, topology names, audit paths, and secret-bearing option values. Local processing does not make that information safe to expose on screen, place in screenshots, copy to the clipboard, or save in a report. Use a trusted browser profile and device, reset or close the tab after use, and protect downloaded files.
 
 ## Hosting considerations
 
-The static hosting provider can still process ordinary web-server metadata such as an IP address, request time, requested asset, and user agent. That infrastructure-level processing is controlled by the operator and is not part of DHCPulse itself. Operators should publish their own hosting privacy notice where required.
+A static hosting provider can process ordinary request metadata such as IP address, request time, requested asset, referrer, and user agent. That infrastructure-level processing is controlled by the operator and is not application telemetry. Operators should publish their own privacy notice where required.
 
-External documentation and source links are opened only after a user activates them.
+If the build or hosting configuration changes, the operator must verify that:
 
-## Verify the claim
+- the deployed application still has no backend, third-party scripts, analytics, telemetry, service worker persistence, or application endpoints;
+- the effective response and document CSP still blocks connections with `connect-src 'none'`;
+- no reverse proxy, CDN feature, tag manager, injected script, or error-reporting service receives entered or imported data;
+- the compiled assets contain no fetch, XHR, WebSocket, EventSource, or beacon primitive;
+- browser network inspection shows only the expected same-origin static assets until the user follows an external link.
 
-Build the project, serve `dist/`, and inspect the browser network panel. Initial page loading fetches only same-origin HTML, JavaScript, CSS, and the logo. Editing a scenario, switching language, copying, and generating a Markdown file create no network request.
+These checks must be repeated for the actual production host; the repository build cannot attest to hosting-provider behavior.
