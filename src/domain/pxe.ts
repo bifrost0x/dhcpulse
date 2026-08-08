@@ -94,17 +94,27 @@ function isHttpUrl(value: string | undefined): boolean {
 function microsoftExample(input: PxeAnalysisInput, codes: number[]): string {
   const server = input.serverName ?? input.serverAddress ?? '<review-server>';
   const bootFile = input.bootFile ?? '<review-boot-file>';
-  const architectureClasses = codes
-    .map((code) => `${input.vendorClass ?? 'PXEClient'}:Arch:${String(code).padStart(5, '0')}*`)
-    .join(',');
-  const userClassCondition = input.userClass ? ` -UserClass 'EQ,${escapePowerShell(input.userClass)}'` : '';
+  const architectureClasses = codes.map((code) => {
+    const paddedCode = String(code).padStart(5, '0');
+    return {
+      name: `<REVIEW-PXE-ARCH-${paddedCode}>`,
+      data: `${input.vendorClass ?? 'PXEClient'}:Arch:${paddedCode}`,
+    };
+  });
+  const userClassCondition = input.userClass ? ' -UserClass $UserClassConditions' : '';
   return [
     '# REVIEW ONLY - do not apply without environment review',
     "$ScopeId = '<REVIEW-SCOPE-ID>'",
     "$PolicyName = '<REVIEW-POLICY-NAME>'",
     `$BootServer = '${escapePowerShell(server)}'`,
     `$BootFile = '${escapePowerShell(bootFile)}'`,
-    `Add-DhcpServerv4Policy -ScopeId $ScopeId -Name $PolicyName -Condition AND -VendorClass 'EQ,${escapePowerShell(architectureClasses)}'${userClassCondition}`,
+    ...architectureClasses.map(
+      ({ name, data }) =>
+        `Add-DhcpServerv4Class -Name '${escapePowerShell(name)}' -Type Vendor -Data '${escapePowerShell(data)}'`,
+    ),
+    `$VendorClassConditions = ${powerShellArray(['EQ', ...architectureClasses.map(({ name }) => name)])}`,
+    ...(input.userClass ? [`$UserClassConditions = ${powerShellArray(['EQ', input.userClass])}`] : []),
+    `Add-DhcpServerv4Policy -ScopeId $ScopeId -Name $PolicyName -Condition AND -VendorClass $VendorClassConditions${userClassCondition}`,
     'Set-DhcpServerv4OptionValue -ScopeId $ScopeId -PolicyName $PolicyName -OptionId 66 -Value $BootServer',
     'Set-DhcpServerv4OptionValue -ScopeId $ScopeId -PolicyName $PolicyName -OptionId 67 -Value $BootFile',
   ].join('\n');
@@ -112,7 +122,8 @@ function microsoftExample(input: PxeAnalysisInput, codes: number[]): string {
 
 function keaExample(input: PxeAnalysisInput, codes: number[]): string {
   const architectureTest = codes.map((code) => `option[93].hex == 0x${code.toString(16).padStart(4, '0')}`).join(' or ');
-  const vendorTest = input.vendorClass ? ` and option[60].text == '${escapeKeaExpression(input.vendorClass)}'` : '';
+  const vendorPrefix = input.vendorClass ?? 'PXEClient';
+  const vendorTest = ` and substring(option[60].text, 0, ${vendorPrefix.length}) == '${escapeKeaExpression(vendorPrefix)}'`;
   const userClassTest = input.userClass ? ` and option[77].text == '${escapeKeaExpression(input.userClass)}'` : '';
   return JSON.stringify(
     {
@@ -140,6 +151,10 @@ function keaExample(input: PxeAnalysisInput, codes: number[]): string {
 
 function escapePowerShell(value: string): string {
   return value.replaceAll("'", "''");
+}
+
+function powerShellArray(values: string[]): string {
+  return `@(${values.map((value) => `'${escapePowerShell(value)}'`).join(', ')})`;
 }
 
 function escapeKeaExpression(value: string): string {

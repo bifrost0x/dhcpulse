@@ -27,7 +27,19 @@ describe('analyzePxe', () => {
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('REVIEW ONLY');
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('Add-DhcpServerv4Policy');
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('Set-DhcpServerv4OptionValue');
-    expect(result.policyExamples.microsoftDhcpPowerShell).toContain('PXEClient:Arch:00007');
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
+      "Add-DhcpServerv4Class -Name '<REVIEW-PXE-ARCH-00007>' -Type Vendor -Data 'PXEClient:Arch:00007'",
+    );
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
+      "Add-DhcpServerv4Class -Name '<REVIEW-PXE-ARCH-00009>' -Type Vendor -Data 'PXEClient:Arch:00009'",
+    );
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain(
+      "$VendorClassConditions = @('EQ', '<REVIEW-PXE-ARCH-00007>', '<REVIEW-PXE-ARCH-00009>')",
+    );
+    expect(result.policyExamples.microsoftDhcpPowerShell).toContain('-VendorClass $VendorClassConditions');
+    expect(result.policyExamples.microsoftDhcpPowerShell).not.toContain(
+      "-VendorClass 'EQ,PXEClient:Arch:00007*,PXEClient:Arch:00009*'",
+    );
     expect(result.policyExamples.microsoftDhcpPowerShell).toContain('-UserClass');
 
     const kea = JSON.parse(result.policyExamples.keaJson) as {
@@ -36,8 +48,10 @@ describe('analyzePxe', () => {
     };
     expect(kea.notice).toContain('REVIEW ONLY');
     expect(kea['client-classes']).toHaveLength(2);
-    expect(kea['client-classes'][0]?.test).toContain('option[93].hex');
-    expect(kea['client-classes'][0]?.test).toContain('option[60].text');
+    expect(kea['client-classes'][0]?.test).toContain('option[93].hex == 0x0007');
+    expect(kea['client-classes'][0]?.test).toContain('option[93].hex == 0x0009');
+    expect(kea['client-classes'][0]?.test).toContain("substring(option[60].text, 0, 9) == 'PXEClient'");
+    expect(kea['client-classes'][0]?.test).not.toContain("option[60].text == 'PXEClient'");
     expect(kea['client-classes'][1]?.test).toContain('option[77].text');
     expect(kea['client-classes'][1]?.['option-data']).toEqual([
       { code: 66, data: 'pxe.example.test' },
