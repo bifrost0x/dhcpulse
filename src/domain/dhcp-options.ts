@@ -165,6 +165,10 @@ function encodeValue(type: DhcpOptionValueType, value: unknown, warnings: string
       return ipv4Bytes(requireString(value));
     case 'ipv4-list':
       return splitList(value, ',').flatMap(ipv4Bytes);
+    case 'ipv6':
+      return ipv6Bytes(requireString(value));
+    case 'ipv6-list':
+      return splitList(value, ',').flatMap(ipv6Bytes);
     case 'string':
       return [...new TextEncoder().encode(requireString(value))];
     case 'uint8':
@@ -195,6 +199,12 @@ function decodeValue(type: DhcpOptionValueType, bytes: number[], warnings: strin
     case 'ipv4-list':
       if (bytes.length === 0 || bytes.length % 4 !== 0) throw new Error('IPv4 list data must contain complete four-octet addresses.');
       return chunks(bytes, 4).map(bytesToIpv4);
+    case 'ipv6':
+      requireLength(bytes, 16, 'IPv6');
+      return bytesToIpv6(bytes);
+    case 'ipv6-list':
+      if (bytes.length === 0 || bytes.length % 16 !== 0) throw new Error('IPv6 list data must contain complete sixteen-octet addresses.');
+      return chunks(bytes, 16).map(bytesToIpv6);
     case 'string':
       return new TextDecoder().decode(Uint8Array.from(bytes));
     case 'uint8':
@@ -226,7 +236,7 @@ function decodeValue(type: DhcpOptionValueType, bytes: number[], warnings: strin
 }
 
 function display(type: DhcpOptionValueType, value: unknown): string {
-  if (type === 'ipv4-list' || type === 'domain-search') return (value as string[]).join(', ');
+  if (type === 'ipv4-list' || type === 'ipv6-list' || type === 'domain-search') return (value as string[]).join(', ');
   if (type === 'classless-routes') return (value as string[]).join('; ');
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   return String(value);
@@ -241,6 +251,69 @@ function ipv4Bytes(value: string): number[] {
 function bytesToIpv4(bytes: number[]): string {
   requireLength(bytes, 4, 'IPv4');
   return bytes.join('.');
+}
+
+function ipv6Bytes(value: string): number[] {
+  const original = value;
+  let address = value.trim();
+  if (!address || address.includes('%')) throw new Error(`Invalid IPv6 address: ${original}`);
+
+  if (address.includes('.')) {
+    const separator = address.lastIndexOf(':');
+    const ipv4 = separator >= 0 ? parseIpv4(address.slice(separator + 1)) : null;
+    if (ipv4 === null) throw new Error(`Invalid IPv6 address: ${original}`);
+    address = `${address.slice(0, separator)}:${((ipv4 >>> 16) & 0xffff).toString(16)}:${(ipv4 & 0xffff).toString(16)}`;
+  }
+
+  const halves = address.split('::');
+  if (halves.length > 2) throw new Error(`Invalid IPv6 address: ${original}`);
+  const left = ipv6Groups(halves[0] ?? '', original);
+  const right = halves.length === 2 ? ipv6Groups(halves[1] ?? '', original) : [];
+  const groupCount = left.length + right.length;
+  if (
+    (halves.length === 1 && groupCount !== 8) ||
+    (halves.length === 2 && groupCount >= 8)
+  ) {
+    throw new Error(`Invalid IPv6 address: ${original}`);
+  }
+
+  const groups = halves.length === 2
+    ? [...left, ...new Array<number>(8 - groupCount).fill(0), ...right]
+    : left;
+  return groups.flatMap((group) => [group >>> 8, group & 0xff]);
+}
+
+function ipv6Groups(value: string, original: string): number[] {
+  if (!value) return [];
+  const groups = value.split(':');
+  if (groups.some((group) => !/^[0-9a-f]{1,4}$/i.test(group))) {
+    throw new Error(`Invalid IPv6 address: ${original}`);
+  }
+  return groups.map((group) => Number.parseInt(group, 16));
+}
+
+function bytesToIpv6(bytes: number[]): string {
+  requireLength(bytes, 16, 'IPv6');
+  const groups = chunks(bytes, 2).map((pair) => ((pair[0] ?? 0) << 8) | (pair[1] ?? 0));
+  let bestStart = -1;
+  let bestLength = 0;
+  for (let start = 0; start < groups.length;) {
+    if (groups[start] !== 0) {
+      start += 1;
+      continue;
+    }
+    let end = start;
+    while (end < groups.length && groups[end] === 0) end += 1;
+    if (end - start > bestLength && end - start >= 2) {
+      bestStart = start;
+      bestLength = end - start;
+    }
+    start = end;
+  }
+  if (bestStart < 0) return groups.map((group) => group.toString(16)).join(':');
+  const before = groups.slice(0, bestStart).map((group) => group.toString(16)).join(':');
+  const after = groups.slice(bestStart + bestLength).map((group) => group.toString(16)).join(':');
+  return `${before}::${after}`;
 }
 
 function integerBytes(value: unknown, length: number): number[] {

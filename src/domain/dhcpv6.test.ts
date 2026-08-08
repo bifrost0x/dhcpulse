@@ -165,6 +165,39 @@ describe('analyzeDhcpv6', () => {
     );
   });
 
+  it('marks required stateless DNS delivery as caution when option 23 is absent', () => {
+    const result = analyze({ dnsOptionPresent: false });
+
+    expect(result.readiness).toBe('caution');
+    expect(result.findings).toContainEqual(
+      expect.objectContaining({
+        id: 'dhcpv6-dns-option-missing',
+        severity: 'warning',
+        evidence: ['mode=stateless', 'raFlagO=true', 'dnsOptionPresent=false'],
+        source: 'https://www.rfc-editor.org/rfc/rfc3646',
+      }),
+    );
+    expect(
+      result.validationChecklist.find(({ key }) => key === 'dns-option'),
+    ).toMatchObject({ passed: false });
+  });
+
+  it('does not require DHCPv6 DNS delivery for SLAAC-only mode without O', () => {
+    const result = analyze({
+      mode: 'slaac-only',
+      raFlags: { m: false, o: false, a: true, p: false },
+      duidPresent: false,
+      iaidPresent: false,
+      dnsOptionPresent: false,
+    });
+
+    expect(result.readiness).toBe('ready');
+    expect(result.findings.map(({ id }) => id)).not.toContain('dhcpv6-dns-option-missing');
+    expect(
+      result.validationChecklist.find(({ key }) => key === 'dns-option'),
+    ).toMatchObject({ passed: true });
+  });
+
   it('warns when stateless and SLAAC modes lack their required RA signals', () => {
     const stateless = analyze({ raFlags: { m: false, o: false, a: true, p: false } });
     const slaac = analyze({

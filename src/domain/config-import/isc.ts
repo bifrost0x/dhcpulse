@@ -263,10 +263,14 @@ function tokenize(text: string): IscToken[] {
       continue;
     }
     if (current === '/' && text[index + 1] === '*') {
+      const startLine = line;
       index += 2;
       while (index < text.length && !(text[index] === '*' && text[index + 1] === '/')) {
         if (text[index] === '\n') line += 1;
         index += 1;
+      }
+      if (index >= text.length) {
+        throw malformedIsc(`Unterminated block comment starting on line ${startLine}.`);
       }
       index += 2;
       continue;
@@ -281,6 +285,7 @@ function tokenize(text: string): IscToken[] {
       index += 1;
       let value = '';
       let escaped = false;
+      let terminated = false;
       while (index < text.length) {
         const character = text[index] ?? '';
         index += 1;
@@ -288,11 +293,17 @@ function tokenize(text: string): IscToken[] {
           value += character;
           escaped = false;
         } else if (character === '\\') escaped = true;
-        else if (character === '"') break;
+        else if (character === '"') {
+          terminated = true;
+          break;
+        }
         else {
           if (character === '\n') line += 1;
           value += character;
         }
+      }
+      if (!terminated) {
+        throw malformedIsc(`Unterminated string starting on line ${startLine}.`);
       }
       tokens.push({ value, line: startLine });
       continue;
@@ -314,7 +325,12 @@ function parseNodes(tokens: IscToken[], start = 0, depth = 0): { nodes: IscNode[
   const nodes: IscNode[] = [];
   let index = start;
   while (index < tokens.length) {
-    if (tokens[index]?.value === '}') return { nodes, index: index + 1 };
+    if (tokens[index]?.value === '}') {
+      if (depth === 0) {
+        throw malformedIsc(`Unexpected closing brace on line ${tokens[index]?.line ?? 1}.`);
+      }
+      return { nodes, index: index + 1 };
+    }
     const header: IscToken[] = [];
     while (index < tokens.length && !['{', ';', '}'].includes(tokens[index]?.value ?? '')) {
       const token = tokens[index];
@@ -330,14 +346,23 @@ function parseNodes(tokens: IscToken[], start = 0, depth = 0): { nodes: IscNode[
       nodes.push({ kind: 'statement', tokens: header });
       index += 1;
     } else if (delimiter === '}') {
-      if (header.length) nodes.push({ kind: 'statement', tokens: header });
-      return { nodes, index: index + 1 };
+      throw malformedIsc(
+        `Unexpected closing brace before a statement terminator on line ${tokens[index]?.line ?? 1}.`,
+      );
     } else {
-      if (header.length) nodes.push({ kind: 'statement', tokens: header });
-      break;
+      if (header.length) {
+        throw malformedIsc(`Unexpected end of file after line ${header.at(-1)?.line ?? 1}.`);
+      }
     }
   }
+  if (depth > 0) {
+    throw malformedIsc('Unexpected end of file while parsing an ISC block.');
+  }
   return { nodes, index };
+}
+
+function malformedIsc(message: string): ConfigImportError {
+  return new ConfigImportError('MALFORMED_ISC', message);
 }
 
 function values(tokens: IscToken[]): string[] {

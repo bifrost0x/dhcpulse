@@ -26,6 +26,14 @@ describe('DHCP option catalog', () => {
     expect(searchDhcpOptions('dns', 'dhcpv6').map(({ code }) => code)).toEqual([23, 24]);
     expect(searchDhcpOptions('', 'dhcpv6')).toHaveLength(13);
   });
+
+  it('models DHCPv6 option 23 as a typed IPv6 address list', () => {
+    expect(
+      dhcpOptionDefinitions.find(
+        ({ protocol, code }) => protocol === 'dhcpv6' && code === 23,
+      ),
+    ).toMatchObject({ valueType: 'ipv6-list', source: 'RFC 3646 section 3' });
+  });
 });
 
 describe('DHCP option codecs', () => {
@@ -38,6 +46,40 @@ describe('DHCP option codecs', () => {
       displayValue: '192.0.2.1, 198.51.100.2',
       warnings: [],
     });
+  });
+
+  it('encodes and decodes RFC 3646 recursive DNS servers with canonical IPv6 output', () => {
+    const value = '2001:0DB8:0:0:0:0:0:53, 2001:db8:0:1::53';
+    const hex =
+      '20010db8000000000000000000000053' +
+      '20010db8000000010000000000000053';
+
+    expect(encodeDhcpOption({ protocol: 'dhcpv6', code: 23, value })).toMatchObject({
+      hex,
+      warnings: [],
+      definition: { valueType: 'ipv6-list' },
+    });
+    expect(decodeDhcpOption({ protocol: 'dhcpv6', code: 23, hex })).toMatchObject({
+      value: ['2001:db8::53', '2001:db8:0:1::53'],
+      displayValue: '2001:db8::53, 2001:db8:0:1::53',
+      warnings: [],
+    });
+  });
+
+  it.each([
+    ['IPv4 is not an IPv6 literal', '192.0.2.1'],
+    ['multiple compression markers', '2001:db8::1::53'],
+    ['too many groups', '2001:db8:0:0:0:0:0:0:53'],
+    ['zone identifiers are not option literals', 'fe80::1%eth0'],
+    ['empty list item', '2001:db8::53,'],
+  ])('rejects malformed RFC 3646 address lists: %s', (_case, value) => {
+    expect(() => encodeDhcpOption({ protocol: 'dhcpv6', code: 23, value })).toThrow(/IPv6|empty item/i);
+  });
+
+  it.each(['', '20010db80000000000000000000000'])('rejects incomplete RFC 3646 wire data: %s', (hex) => {
+    expect(() => decodeDhcpOption({ protocol: 'dhcpv6', code: 23, hex })).toThrow(
+      /complete sixteen-octet addresses/i,
+    );
   });
 
   it('encodes uint32 leases and DHCP message types with literal wire values', () => {

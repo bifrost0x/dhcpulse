@@ -132,6 +132,8 @@ export type DhcpProtocol = 'dhcpv4' | 'dhcpv6';
 export type DhcpOptionValueType =
   | 'ipv4'
   | 'ipv4-list'
+  | 'ipv6'
+  | 'ipv6-list'
   | 'string'
   | 'uint8'
   | 'uint16'
@@ -350,6 +352,7 @@ export type Dhcpv6FindingId =
   | 'dhcpv6-p-flag-without-prefix-delegation'
   | 'dhcpv6-prefix-delegation-signal-missing'
   | 'dhcpv6-client-identity-missing'
+  | 'dhcpv6-dns-option-missing'
   | 'dhcpv6-relay-link-address-missing'
   | 'dhcpv6-windows-failover-assumed'
   | 'dhcpv6-t1-not-before-t2'

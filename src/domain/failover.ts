@@ -38,24 +38,24 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
   const transitionOperandsValid =
     isNonNegativeSafeInteger(input.stateSwitchoverMinutes) &&
     isNonNegativeSafeInteger(input.mcltMinutes);
-  const transitionCandidate = transitionOperandsValid
+  const fullPoolEligibilityCandidate = transitionOperandsValid
     ? input.stateSwitchoverMinutes + input.mcltMinutes
     : 0;
-  const transitionSumSafe =
-    transitionOperandsValid && Number.isSafeInteger(transitionCandidate);
-  if (transitionOperandsValid && !transitionSumSafe) {
-    invalidNumericEvidence.push('safeTransitionMinutes=unsafe-sum');
+  const fullPoolEligibilitySumSafe =
+    transitionOperandsValid && Number.isSafeInteger(fullPoolEligibilityCandidate);
+  if (transitionOperandsValid && !fullPoolEligibilitySumSafe) {
+    invalidNumericEvidence.push('fullPoolEligibilityMinutes=unsafe-sum');
   }
   const timingInputsValid =
     timingEntries.every(([, value]) => isNonNegativeSafeInteger(value)) &&
-    transitionSumSafe;
+    fullPoolEligibilitySumSafe;
   const numericInputsValid = invalidNumericEvidence.length === 0;
   if (!numericInputsValid) {
     findings.push(
       finding(
         'failover-invalid-numeric-input',
         'blocker',
-        'Failover timing values must be nonnegative safe integers, their transition sum must remain safe, and percentages must be integers from 0 through 100.',
+        'Failover timing values must be nonnegative safe integers, their full-pool eligibility sum must remain safe, and percentages must be integers from 0 through 100.',
         invalidNumericEvidence,
       ),
     );
@@ -179,23 +179,9 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
     );
   }
 
-  const safeTransitionMinutes = transitionSumSafe ? transitionCandidate : 0;
-  if (
-    timingInputsValid &&
-    input.plannedOutageMinutes > safeTransitionMinutes
-  ) {
-    findings.push(
-      finding(
-        'failover-outage-exceeds-safe-window',
-        'warning',
-        'The planned outage exceeds the modeled state-switchover plus MCLT transition window.',
-        [
-          `plannedOutageMinutes=${input.plannedOutageMinutes}`,
-          `safeTransitionMinutes=${safeTransitionMinutes}`,
-        ],
-      ),
-    );
-  }
+  const fullPoolEligibilityMinutes = fullPoolEligibilitySumSafe
+    ? fullPoolEligibilityCandidate
+    : 0;
 
   findings.push(
     finding(
@@ -233,7 +219,7 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
           },
           {
             state: 'mclt-full-pool-eligible',
-            afterMinutes: safeTransitionMinutes,
+            afterMinutes: fullPoolEligibilityMinutes,
             rationale:
               'If the partner remains unavailable, this conditional milestone marks state switchover plus MCLT, when full-pool ownership may become eligible; it does not imply recovery.',
           },
@@ -247,7 +233,7 @@ export function analyzeWindowsFailover(input: WindowsFailoverInput): WindowsFail
     findings,
     validationChecklist: validationChecklist(
       safeInput,
-      safeTransitionMinutes,
+      fullPoolEligibilityMinutes,
       numericInputsValid,
     ),
   };
@@ -271,9 +257,15 @@ function partnerRoles(input: WindowsFailoverInput): FailoverPartnerRoles {
 
 function validationChecklist(
   input: WindowsFailoverInput,
-  safeTransitionMinutes: number,
+  fullPoolEligibilityMinutes: number,
   numericInputsValid: boolean,
 ): ValidationChecklistItem[] {
+  const preTakeoverCapacityPercent = input.mode === 'load-balance'
+    ? Math.min(input.loadBalancePercentage, 100 - input.loadBalancePercentage)
+    : input.reservePercentage;
+  const capacityRationale = input.mode === 'load-balance'
+    ? `the surviving load-balance partner has a modeled ${preTakeoverCapacityPercent}% share`
+    : `the surviving hot-standby partner has a modeled ${preTakeoverCapacityPercent}% reserve`;
   return [
     item(
       'numeric-inputs',
@@ -294,9 +286,9 @@ function validationChecklist(
       'State switchover is not below MCLT.',
     ),
     item(
-      'planned-outage',
-      input.plannedOutageMinutes <= safeTransitionMinutes,
-      'Planned outage stays within the modeled safe transition window.',
+      'pre-takeover-capacity',
+      input.plannedOutageMinutes === 0 || preTakeoverCapacityPercent > 0,
+      `Before full-pool eligibility at ${fullPoolEligibilityMinutes} minutes, ${capacityRationale}; verify that this capacity tolerates the planned demand.`,
     ),
     item('dhcpv4-scope', input.scopeProtocol === 'dhcpv4', 'Scope uses DHCPv4.'),
   ];

@@ -40,6 +40,7 @@ describe('analyzeWindowsFailover', () => {
       'mclt-full-pool-eligible',
     ]);
     expect(result.timeline.at(-1)?.rationale).toContain('If the partner remains unavailable');
+    expect(result.timeline.at(-1)?.rationale).toContain('full-pool ownership may become eligible');
     expect(result.findings).toEqual([
       expect.objectContaining({
         id: 'windows-failover-ipv4-only',
@@ -101,7 +102,7 @@ describe('analyzeWindowsFailover', () => {
     );
   });
 
-  it('warns on state timing, relay duplication, and a modeled outage overrun', () => {
+  it('warns on state timing and relay duplication without treating the takeover milestone as an outage limit', () => {
     const loadBalance = analyze({
       mcltMinutes: 60,
       stateSwitchoverMinutes: 30,
@@ -111,10 +112,46 @@ describe('analyzeWindowsFailover', () => {
 
     expect(loadBalance.findings.map(({ id }) => id)).toEqual([
       'failover-duplicate-relay-forwarding',
-      'failover-outage-exceeds-safe-window',
       'failover-state-switchover-below-mclt',
       'windows-failover-ipv4-only',
     ]);
+  });
+
+  it('models switchover plus MCLT as full-pool eligibility instead of a maximum safe outage', () => {
+    const result = analyze({ plannedOutageMinutes: 300 });
+
+    expect(result.readiness).toBe('ready');
+    expect(result.findings.map(({ id }) => id)).not.toContain(
+      'failover-outage-exceeds-safe-window',
+    );
+    expect(result.timeline.at(-1)).toMatchObject({
+      state: 'mclt-full-pool-eligible',
+      afterMinutes: 150,
+    });
+    expect(result.validationChecklist).toContainEqual({
+      key: 'pre-takeover-capacity',
+      passed: true,
+      rationale:
+        'Before full-pool eligibility at 150 minutes, the surviving load-balance partner has a modeled 50% share; verify that this capacity tolerates the planned demand.',
+    });
+    expect(result.validationChecklist.map(({ key }) => key)).not.toContain('planned-outage');
+  });
+
+  it('checks the hot-standby reserve available before full-pool eligibility', () => {
+    const withReserve = analyze({ mode: 'hot-standby', reservePercentage: 5 });
+    const withoutReserve = analyze({ mode: 'hot-standby', reservePercentage: 0 });
+
+    expect(
+      withReserve.validationChecklist.find(({ key }) => key === 'pre-takeover-capacity'),
+    ).toEqual({
+      key: 'pre-takeover-capacity',
+      passed: true,
+      rationale:
+        'Before full-pool eligibility at 150 minutes, the surviving hot-standby partner has a modeled 5% reserve; verify that this capacity tolerates the planned demand.',
+    });
+    expect(
+      withoutReserve.validationChecklist.find(({ key }) => key === 'pre-takeover-capacity'),
+    ).toMatchObject({ passed: false });
   });
 
   it('blocks missing partner paths and lack of client reachability', () => {
@@ -191,7 +228,7 @@ describe('analyzeWindowsFailover', () => {
       expect.objectContaining({
         id: 'failover-invalid-numeric-input',
         severity: 'blocker',
-        evidence: ['safeTransitionMinutes=unsafe-sum'],
+        evidence: ['fullPoolEligibilityMinutes=unsafe-sum'],
       }),
     );
     expect(result.timeline).toEqual([]);

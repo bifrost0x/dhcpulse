@@ -38,7 +38,7 @@ const v6: DefinitionSeed[] = [
   [7, 'Preference', ['server preference'], 'uint8', false, 'Server preference value.', 'RFC 8415 section 21.8'],
   [8, 'Elapsed Time', ['elapsed'], 'uint16', false, 'Elapsed centiseconds since solicitation began.', 'RFC 8415 section 21.9'],
   [13, 'Status Code', ['status'], 'hex', true, 'DHCPv6 status code and message.', 'RFC 8415 section 21.13'],
-  [23, 'DNS Recursive Name Server', ['dns', 'recursive resolver'], 'hex', false, 'IPv6 recursive resolver address list.', 'RFC 3646 section 3'],
+  [23, 'DNS Recursive Name Server', ['dns', 'recursive resolver'], 'ipv6-list', false, 'IPv6 recursive resolver address list.', 'RFC 3646 section 3'],
   [24, 'Domain Search List', ['search list'], 'domain-search', false, 'DHCPv6 DNS suffix search list.', 'RFC 3646 section 4'],
   [25, 'Identity Association for Prefix Delegation', ['ia-pd'], 'hex', true, 'Delegated-prefix identity association.', 'RFC 8415 section 21.21'],
   [26, 'IA Prefix', ['iaprefix'], 'hex', true, 'Delegated IPv6 prefix and lifetimes.', 'RFC 8415 section 21.22'],

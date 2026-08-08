@@ -11,6 +11,7 @@ import type {
 const RFC_9915 = 'https://www.rfc-editor.org/rfc/rfc9915';
 const RFC_4861 = 'https://www.rfc-editor.org/rfc/rfc4861';
 const RFC_4862 = 'https://www.rfc-editor.org/rfc/rfc4862';
+const RFC_3646 = 'https://www.rfc-editor.org/rfc/rfc3646';
 const RFC_9762 = 'https://www.rfc-editor.org/rfc/rfc9762';
 const WINDOWS_FAILOVER_SOURCE =
   'https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-failover';
@@ -186,6 +187,21 @@ export function analyzeDhcpv6(input: Dhcpv6Input): Dhcpv6Result {
       ),
     );
   }
+  if (dnsDeliveryRequired(input) && !input.dnsOptionPresent) {
+    findings.push(
+      finding(
+        'dhcpv6-dns-option-missing',
+        'warning',
+        'DHCPv6 DNS delivery requires the Recursive Name Server option.',
+        [
+          `mode=${input.mode}`,
+          `raFlagO=${input.raFlags.o}`,
+          'dnsOptionPresent=false',
+        ],
+        RFC_3646,
+      ),
+    );
+  }
   if (input.relayUsed && !input.relayLinkAddress?.trim()) {
     findings.push(
       finding(
@@ -317,9 +333,13 @@ function checklist(input: Dhcpv6Input): ValidationChecklistItem[] {
       !['stateful', 'prefix-delegation'].includes(input.mode) || input.iaidPresent,
       'IAID is present for stateful address or prefix identity associations.',
     ),
-    item('dns-option', input.mode === 'slaac-only' || input.dnsOptionPresent, 'DNS option is present when DHCPv6 is expected.'),
+    item('dns-option', !dnsDeliveryRequired(input) || input.dnsOptionPresent, 'DNS option is present when DHCPv6 is expected.'),
     item('relay-link-address', !input.relayUsed || Boolean(input.relayLinkAddress?.trim()), 'Relay link-address is present when relaying is used.'),
   ];
+}
+
+function dnsDeliveryRequired(input: Dhcpv6Input): boolean {
+  return input.mode !== 'slaac-only';
 }
 
 function item(key: string, passed: boolean, rationale: string): ValidationChecklistItem {

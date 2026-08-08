@@ -13,6 +13,7 @@ export type ConfigImportErrorCode =
   | 'UNSAFE_XML'
   | 'MALFORMED_XML'
   | 'MALFORMED_JSON'
+  | 'MALFORMED_ISC'
   | 'STRUCTURE_TOO_COMPLEX'
   | 'UNKNOWN_FORMAT';
 

@@ -275,6 +275,17 @@ describe('importDhcpConfiguration', () => {
     expectImportError(text, fileName, code);
   });
 
+  it.each([
+    ['unterminated string', 'subnet 192.0.2.0 netmask 255.255.255.0 { option domain-name "example.test; }'],
+    ['unterminated block comment', 'subnet 192.0.2.0 netmask 255.255.255.0 { /* unfinished'],
+    ['unmatched opening brace', 'subnet 192.0.2.0 netmask 255.255.255.0 { range 192.0.2.10 192.0.2.20;'],
+    ['premature EOF', 'default-lease-time 3600'],
+    ['closing brace before statement terminator', 'subnet 192.0.2.0 netmask 255.255.255.0 { range 192.0.2.10 192.0.2.20 }'],
+    ['unexpected closing brace', 'subnet 192.0.2.0 netmask 255.255.255.0 { } }'],
+  ] as const)('rejects malformed ISC with stable code: %s', (_case, text) => {
+    expectImportErrorWithFormat(text, 'isc-dhcpd', 'MALFORMED_ISC');
+  });
+
   it('rejects UTF-8 input larger than 2 MiB before parsing', () => {
     expectImportError(`{"Dhcp4":"${'x'.repeat(2 * 1024 * 1024)}"}`, 'kea.json', 'INPUT_TOO_LARGE');
   });
