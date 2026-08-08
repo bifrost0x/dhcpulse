@@ -13,15 +13,22 @@ export interface WorkbenchReportSource {
   url: string;
 }
 
+export type WorkbenchReportInputValue =
+  | number
+  | boolean
+  | null
+  | WorkbenchReportInputValue[]
+  | { [key: string]: WorkbenchReportInputValue };
+
 export interface WorkbenchReportInput {
   toolId: string;
   toolName: string;
   generatedAt: string;
-  inputs: Record<string, unknown>;
+  inputs: Record<string, WorkbenchReportInputValue>;
   findings: WorkbenchReportFinding[];
   assumptions: string[];
   sources: WorkbenchReportSource[];
-  sensitiveValues?: string[];
+  sensitiveValues: readonly string[];
   locale?: 'en' | 'de';
 }
 
@@ -53,7 +60,7 @@ const reportCopy = {
 export function buildWorkbenchReport(input: WorkbenchReportInput): WorkbenchReport {
   const copy = reportCopy[input.locale ?? 'en'];
   const redactor = createRedactor(`workbench:${input.toolId}`);
-  const sensitiveValues = [...new Set(input.sensitiveValues?.filter(Boolean) ?? [])]
+  const sensitiveValues = [...new Set(input.sensitiveValues.filter(Boolean))]
     .sort((left, right) => right.length - left.length);
   const scrubText = (value: string): string => {
     const replaced = sensitiveValues.reduce(
@@ -62,7 +69,7 @@ export function buildWorkbenchReport(input: WorkbenchReportInput): WorkbenchRepo
     );
     return redactor.redactText(replaced);
   };
-  const safeInputs = sortValue(scrubUnknown(input.inputs, scrubText)) as Record<string, unknown>;
+  const safeInputs = sortValue(scrubInputSummary(input.inputs)) as Record<string, WorkbenchReportInputValue>;
   const safeFindings = input.findings
     .map((finding) => ({
       severity: finding.severity,
@@ -127,11 +134,11 @@ export function downloadWorkbenchReport(content: string, filename: string, type 
   }
 }
 
-function scrubUnknown(value: unknown, scrubText: (value: string) => string): unknown {
-  if (typeof value === 'string') return scrubText(value);
-  if (Array.isArray(value)) return value.map((entry) => scrubUnknown(entry, scrubText));
+function scrubInputSummary(value: unknown): unknown {
+  if (typeof value === 'string') return '[redacted]';
+  if (Array.isArray(value)) return value.map(scrubInputSummary);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, scrubUnknown(entry, scrubText)]));
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, scrubInputSummary(entry)]));
   }
   return value;
 }

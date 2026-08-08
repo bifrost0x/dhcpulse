@@ -22,29 +22,41 @@ export function ScopeTool({ locale }: ToolPanelProps) {
   const exclusions = useMemo(() => parseRanges(state.exclusions), [state.exclusions]);
   const reservations = useMemo(() => lines(state.reservations).map((address, index) => ({ id: `reservation-${index + 1}`, address })), [state.reservations]);
   const result = useMemo(() => {
-    const scopes = poolRanges.map((pool, index) => ({ id: `pool-${index + 1}`, cidr: state.cidr, gateway: state.gateway, pool, exclusions, reservations, leases: index === 0 ? state.leases : 0 }));
-    const individual = scopes.flatMap((scope) => analyzeScopeDesign({ scopes: [scope], dailyGrowth: state.growth }).findings);
+    const scopes = poolRanges.map((pool, index) => ({ id: `pool-${index + 1}`, cidr: state.cidr, gateway: state.gateway, pool, exclusions: [], reservations: [], leases: 0 }));
+    const exclusionsByPool = scopes.map(() => [] as typeof exclusions);
+    const standaloneExclusionFindings: ScopeFinding[] = [];
+    for (const exclusion of exclusions) {
+      const checks = scopes.map((scope) => analyzeScopeDesign({ scopes: [{ ...scope, exclusions: [exclusion] }] }));
+      const applicable = checks.map((check, index) => check.scopes[0]!.excludedAddresses > 0 ? index : -1).filter((index) => index >= 0);
+      if (applicable.length > 0) applicable.forEach((index) => exclusionsByPool[index]!.push(exclusion));
+      else standaloneExclusionFindings.push(...(checks[0]?.findings.filter(({ key }) => key === 'invalidExclusionRange' || key === 'exclusionOutsidePool') ?? []));
+    }
+    const analyzed = scopes.map((scope, index) => analyzeScopeDesign({ scopes: [{ ...scope, exclusions: exclusionsByPool[index] }] }));
+    const individual = analyzed.flatMap(({ findings }) => findings.filter(({ key }) => !['overCapacityCurrentLeases', 'exhaustionWithin30Days', 'reservationOutsideSubnet', 'duplicateReservationAddress'].includes(key)));
+    const reservationFindings = scopes[0] ? analyzeScopeDesign({ scopes: [{ ...scopes[0], gateway: undefined, reservations }] }).findings.filter(({ key }) => key === 'reservationOutsideSubnet' || key === 'duplicateReservationAddress') : [];
     const collisions = scopes.length > 1
-      ? analyzeScopeDesign({ scopes, dailyGrowth: state.growth }).findings.filter(({ key }) => key === 'overlappingDynamicPools')
+      ? analyzeScopeDesign({ scopes }).findings.filter(({ key }) => key === 'overlappingDynamicPools')
       : [];
-    const capacities = scopes.map((scope) => analyzeScopeDesign({ scopes: [scope], dailyGrowth: state.growth }).scopes[0]!);
-    return { findings: dedupeFindings([...individual, ...collisions]), capacities };
+    const capacities = analyzed.map(({ scopes: [capacity] }) => capacity!);
+    const effective = capacities.reduce((sum, item) => sum + item.effectiveCapacity, 0);
+    const used = normalizeCount(state.leases);
+    const remaining = Math.max(0, effective - used);
+    const aggregateFindings: ScopeFinding[] = [];
+    if (used > effective) aggregateFindings.push({ key: 'overCapacityCurrentLeases', severity: 'blocker', scopeId: 'aggregate' });
+    if (Number.isFinite(state.growth) && state.growth > 0 && remaining / state.growth <= 30) aggregateFindings.push({ key: 'exhaustionWithin30Days', severity: 'warning', scopeId: 'aggregate' });
+    return { findings: dedupeFindings([...individual, ...standaloneExclusionFindings, ...reservationFindings, ...collisions, ...aggregateFindings]), capacities, totals: { effective, used, remaining } };
   }, [exclusions, poolRanges, reservations, state.cidr, state.gateway, state.growth, state.leases]);
-  const totals = useMemo(() => result.capacities.reduce((sum, item) => ({
-    effective: sum.effective + item.effectiveCapacity,
-    used: sum.used + item.currentlyUsedAddresses,
-    remaining: sum.remaining + item.remainingAddresses,
-  }), { effective: 0, used: 0, remaining: 0 }), [result.capacities]);
+  const totals = result.totals;
   const utilization = totals.effective === 0 ? 0 : Math.min(100, (totals.used / totals.effective) * 100);
   const runway = state.growth > 0 ? Math.floor(totals.remaining / state.growth) : null;
   const hasFinding = (...keys: ScopeFinding['key'][]) => result.findings.some((finding) => keys.includes(finding.key));
   const update = (key: keyof typeof defaults, value: string | number) => setState((current) => ({ ...current, [key]: value }));
   const report = () => buildWorkbenchReport({
     toolId: 'scope', toolName: locale === 'de' ? 'Bereich und Kapazität' : 'Scope and capacity', generatedAt: new Date().toISOString(), locale,
-    inputs: state, findings: result.findings.map((finding) => ({ severity: finding.severity, title: findingLabel(finding.key, locale), detail: `${locale === 'de' ? 'Pool' : 'Pool'} ${finding.scopeId}` })),
+    inputs: { [locale === 'de' ? 'Pool-Anzahl' : 'Pool count']: poolRanges.length, [locale === 'de' ? 'Ausschluss-Anzahl' : 'Exclusion count']: exclusions.length, [locale === 'de' ? 'Reservierungsanzahl' : 'Reservation count']: reservations.length, [locale === 'de' ? 'Aktuelle Leases' : 'Current leases']: normalizeCount(state.leases), [locale === 'de' ? 'Tägliches Wachstum' : 'Daily growth']: normalizeCount(state.growth), [locale === 'de' ? 'Effektive Kapazität' : 'Effective capacity']: totals.effective, [locale === 'de' ? 'Verbleibend' : 'Remaining']: totals.remaining }, findings: result.findings.map((finding) => ({ severity: finding.severity, title: findingLabel(finding.key, locale), detail: `${locale === 'de' ? 'Pool' : 'Pool'} ${finding.scopeId}` })),
     assumptions: [locale === 'de' ? 'Die Reichweite nimmt gleichmäßiges tägliches Wachstum an.' : 'Runway assumes steady daily growth.'],
     sources: [{ label: 'RFC 2131', url: 'https://www.rfc-editor.org/rfc/rfc2131.html' }, { label: 'RFC 4632', url: 'https://www.rfc-editor.org/rfc/rfc4632.html' }],
-    sensitiveValues: [state.gateway, ...lines(state.reservations)],
+    sensitiveValues: [state.cidr, state.gateway, state.pools, state.exclusions, state.reservations, ...lines(state.reservations)],
   });
   return <div className="workbench-grid" data-testid="tool-panel-scope">
     <section className="planner-card workbench-form" aria-labelledby="scope-form-title"><h2 id="scope-form-title">{c.title}</h2>
@@ -70,10 +82,11 @@ export function ScopeTool({ locale }: ToolPanelProps) {
 
 function Field({ label, value, onChange, error }: { label: string; value: string; onChange: (value: string) => void; error?: string }) { const id = idFor(label); return <label className="workbench-field" htmlFor={id}><span>{label}</span><input id={id} value={value} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={(event) => onChange(event.target.value)} />{error && <small id={`${id}-error`} className="field-error">{error}</small>}</label>; }
 function TextField({ label, value, onChange, error }: { label: string; value: string; onChange: (value: string) => void; error?: string }) { const id = idFor(label); return <label className="workbench-field span-2" htmlFor={id}><span>{label}</span><textarea id={id} value={value} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={(event) => onChange(event.target.value)} />{error && <small id={`${id}-error`} className="field-error">{error}</small>}</label>; }
-function NumberField({ label, value, onChange, error }: { label: string; value: number; onChange: (value: number) => void; error?: string }) { const id = idFor(label); return <label className="workbench-field" htmlFor={id}><span>{label}</span><input id={id} type="number" min="0" value={value} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={(event) => onChange(event.target.valueAsNumber)} />{error && <small id={`${id}-error`} className="field-error">{error}</small>}</label>; }
+function NumberField({ label, value, onChange, error }: { label: string; value: number; onChange: (value: number) => void; error?: string }) { const id = idFor(label); return <label className="workbench-field" htmlFor={id}><span>{label}</span><input id={id} type="number" min="0" value={Number.isFinite(value) ? value : ''} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={(event) => onChange(event.target.valueAsNumber)} />{error && <small id={`${id}-error`} className="field-error">{error}</small>}</label>; }
 function idFor(label: string) { return `scope-${label.replace(/\W/g, '-')}`; }
 function lines(value: string) { return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 function parseRanges(value: string, requireOne = false) { const parsed = lines(value).map((item) => { const match = /^\s*([^\s-]+)\s*-\s*([^\s-]+)\s*$/.exec(item); return match ? { start: match[1]!, end: match[2]! } : { start: item, end: '' }; }); return parsed.length || !requireOne ? parsed : [{ start: '', end: '' }]; }
+function normalizeCount(value: number) { return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0; }
 function dedupeFindings(findings: ScopeFinding[]) { const seen = new Set<string>(); return findings.filter((finding) => { const key = `${finding.key}:${finding.scopeId}`; if (seen.has(key)) return false; seen.add(key); return true; }); }
 function findingLabel(key: ScopeFinding['key'], locale: 'en' | 'de') { const labels: Record<ScopeFinding['key'], [string, string]> = { invalidCidr: ['Invalid CIDR', 'Ungültiges CIDR'], invalidPoolRange: ['Invalid pool range', 'Ungültiger Pool-Bereich'], poolOutsideSubnet: ['Pool is outside the subnet', 'Pool liegt außerhalb des Subnetzes'], invalidExclusionRange: ['Invalid exclusion range', 'Ungültiger Ausschlussbereich'], exclusionOutsidePool: ['Exclusion is outside the pool', 'Ausschluss liegt außerhalb des Pools'], reservationOutsideSubnet: ['Reservation is outside the subnet', 'Reservierung liegt außerhalb des Subnetzes'], duplicateReservationAddress: ['Duplicate reservation address', 'Doppelte Reservierungsadresse'], gatewayInDynamicPool: ['Gateway is inside the dynamic pool', 'Gateway liegt im dynamischen Pool'], overlappingScopeNetworks: ['Scope networks overlap', 'Scope-Netze überlappen'], overlappingDynamicPools: ['Dynamic pools overlap', 'Dynamische Pools überlappen'], overCapacityCurrentLeases: ['Current leases exceed capacity', 'Aktuelle Leases überschreiten die Kapazität'], exhaustionWithin30Days: ['Capacity may be exhausted within 30 days', 'Kapazität könnte innerhalb von 30 Tagen erschöpft sein'] }; return labels[key][locale === 'de' ? 1 : 0]; }
 function FindingList({ title, findings, none, locale }: { title: string; findings: { severity: string; text: string }[]; none: string; locale: 'en' | 'de' }) { return <section className="workbench-section"><h3>{title}</h3>{findings.length ? <ul className="finding-list-compact">{findings.map((finding, index) => <li key={`${finding.text}-${index}`} className={`finding-${finding.severity}`}><span className="severity">{severityLabel(finding.severity, locale)}</span>{finding.text}</li>)}</ul> : <p>{none}</p>}</section>; }

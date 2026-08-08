@@ -5,7 +5,7 @@ const reportInput = {
   toolId: 'config-analyzer',
   toolName: 'Configuration analyzer',
   generatedAt: '2026-08-08T10:00:00.000Z',
-  inputs: { vendor: 'Kea', source: 'lab-sensitive.example.test' },
+  inputs: { scopes: 1, auditLoggingConfigured: false },
   findings: [
     { severity: 'warning' as const, title: 'Review reservation', detail: 'lab-sensitive.example.test' },
   ],
@@ -19,7 +19,7 @@ describe('buildWorkbenchReport', () => {
 
   it('builds deterministic Markdown and JSON with redaction and a privacy note', () => {
     const first = buildWorkbenchReport(reportInput);
-    const second = buildWorkbenchReport({ ...reportInput, inputs: { source: 'lab-sensitive.example.test', vendor: 'Kea' } });
+    const second = buildWorkbenchReport({ ...reportInput, inputs: { auditLoggingConfigured: false, scopes: 1 } });
 
     expect(first).toEqual(second);
     expect(first.markdown).toContain('# Configuration analyzer');
@@ -34,10 +34,24 @@ describe('buildWorkbenchReport', () => {
     const opaque = 'PXE_CLASS_Q7Z-private-value';
     const report = buildWorkbenchReport({
       ...reportInput,
-      inputs: { vendorClass: opaque, nested: { bootServer: opaque } },
+      inputs: { architectureCount: 2 },
       findings: [{ severity: 'warning', title: `Review ${opaque}`, detail: opaque }],
       assumptions: [`Do not expose ${opaque}`],
       sensitiveValues: [opaque],
+    });
+
+    expect(report.markdown).not.toContain(opaque);
+    expect(report.json).not.toContain(opaque);
+    expect(report.markdown).toContain('[redacted]');
+  });
+
+  it('never exports an arbitrary raw DHCPv6 input string even when a JavaScript caller omits it from sensitive values', () => {
+    const opaque = 'DHCPV6_PRIVATE_Q7Z_VALUE';
+    const report = buildWorkbenchReport({
+      ...reportInput,
+      inputs: { relayLinkAddress: opaque } as never,
+      findings: [],
+      sensitiveValues: [],
     });
 
     expect(report.markdown).not.toContain(opaque);

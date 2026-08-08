@@ -315,6 +315,28 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getAllByText('Dynamic pools overlap').length).toBeGreaterThan(0);
   });
 
+  it('aggregates leases across multiple pools and applies exclusions only to their relevant pool', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/scope');
+    const pools = screen.getByRole('textbox', { name: 'Pool ranges (start-end, one per line)' });
+    await user.clear(pools);
+    await user.type(pools, '192.0.2.10-192.0.2.20{enter}192.0.2.30-192.0.2.40');
+    await user.clear(screen.getByRole('textbox', { name: /Exclusions/ }));
+    await user.clear(screen.getByRole('textbox', { name: /Reservations/ }));
+    const leases = screen.getByRole('spinbutton', { name: /^Current leases/ });
+    await user.clear(leases);
+    await user.type(leases, '15');
+
+    expect(screen.getByText('22', { selector: '[data-metric="pool-capacity"]' })).toBeVisible();
+    expect(screen.getByText(/7 addresses remain/)).toBeVisible();
+    expect(screen.queryByText('Current leases exceed capacity')).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name: /Exclusions/ }), '192.0.2.12-192.0.2.13');
+    expect(screen.getByText('20', { selector: '[data-metric="pool-capacity"]' })).toBeVisible();
+    expect(screen.getByText(/5 addresses remain/)).toBeVisible();
+    expect(screen.queryByText('Exclusion is outside the pool')).not.toBeInTheDocument();
+  });
+
   it('encodes the domain-search example and reports malformed hexadecimal data', async () => {
     const user = userEvent.setup();
     renderAt('#/tool/options');
@@ -401,6 +423,22 @@ describe('DHCPulse Workbench', () => {
     renderAt('#/tool/dhcpv6');
     expect(screen.getByText('256', { selector: '.metric-value' })).toBeVisible();
     expect(screen.getByText(/Router Advertisements supply the IPv6 default route/i)).toBeVisible();
+  });
+
+  it('omits an opaque DHCPv6 relay address from the downloaded Markdown report', async () => {
+    const user = userEvent.setup();
+    const opaque = 'DHCPV6_PRIVATE_Q7Z_VALUE';
+    let reportBlob: Blob | undefined;
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob: Blob) => { reportBlob = blob; return 'blob:dhcpv6-report'; }) });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderAt('#/tool/dhcpv6');
+    await user.click(screen.getByRole('checkbox', { name: 'DHCPv6 relay used' }));
+    await user.type(screen.getByRole('textbox', { name: /^Relay link-address/ }), opaque);
+    await user.click(screen.getByRole('button', { name: 'Download report' }));
+
+    expect(reportBlob).toBeDefined();
+    expect(await readBlob(reportBlob!)).not.toContain(opaque);
   });
 
   it('ranks the relay cause and provides packet filters and read-only commands', () => {
@@ -558,6 +596,24 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('button', { name: 'Konfiguration analysieren' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Bericht herunterladen' })).toBeVisible();
     expect(document.body).not.toHaveTextContent(/workbench\.[a-z]/i);
+  });
+
+  it('localizes analyzer warning text and German report input keys', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/config-analyzer');
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Konfigurationsformat' }), 'dnsmasq');
+    const text = screen.getByRole('textbox', { name: 'Konfigurationstext' });
+    await user.clear(text);
+    await user.type(text, 'dhcp-range=192.0.2.10,192.0.2.20,255.255.255.0,192.0.2.255,1h');
+    await user.click(screen.getByRole('button', { name: 'Konfiguration analysieren' }));
+
+    expect(screen.getAllByText(/Nicht unterstützte Anweisung/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/unsupported-directive/)).not.toBeInTheDocument();
+    await user.click(screen.getByText('Redigierte Berichtsvorschau'));
+    const preview = document.querySelector('.report-preview')!;
+    expect(preview).toHaveTextContent(/Bereiche: 1/);
+    expect(preview).not.toHaveTextContent(/scopes: 1/);
   });
 
   it('presents domain-derived diagnostics and report privacy copy in German', async () => {
