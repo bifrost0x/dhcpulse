@@ -1,6 +1,6 @@
 import { AlertTriangle, Check, Clipboard, Download, Info, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
-import { createMarkdownPlan, downloadMarkdown, formatDuration } from '../domain/export';
+import { createJsonPlan, createMarkdownPlan, downloadJson, downloadMarkdown, formatDuration } from '../domain/export';
 import { translate, type CopyKey, type Locale } from '../content/copy';
 import type { PlanResult, ScenarioInput } from '../domain/types';
 import { Checklist } from './Checklist';
@@ -11,6 +11,7 @@ export function ResultsPanel({ input, result, locale }: { input: ScenarioInput; 
   const [copied, setCopied] = useState(false);
   const t = (key: CopyKey) => translate(locale, key);
   const markdown = createMarkdownPlan(input, result, locale);
+  const json = createJsonPlan(input, result, locale);
   const icon = result.verdict === 'ready' ? <Check aria-hidden="true" /> : result.verdict === 'caution' ? <AlertTriangle aria-hidden="true" /> : <ShieldAlert aria-hidden="true" />;
   const renewal = result.timeline.waves[0]?.clientsWithinFirstHour ?? 0;
   const rebindingStart = result.timeline.waves[1]?.startsAfterHours ?? 0;
@@ -64,6 +65,7 @@ export function ResultsPanel({ input, result, locale }: { input: ScenarioInput; 
       <div className="export-bar">
         <button type="button" className="secondary-button" onClick={copyPlan}>{copied ? <Check size={17} aria-hidden="true" /> : <Clipboard size={17} aria-hidden="true" />}{t(copied ? 'export.copied' : 'export.copy')}</button>
         <button type="button" className="primary-button" onClick={() => downloadMarkdown(markdown)}><Download size={17} aria-hidden="true" />{t('export.download')}</button>
+        <button type="button" className="primary-button" onClick={() => downloadJson(json)}><Download size={17} aria-hidden="true" />{t('export.downloadJson')}</button>
       </div>
 
       <PrivacyNote locale={locale} />

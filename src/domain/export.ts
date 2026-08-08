@@ -61,6 +61,16 @@ export function createMarkdownPlan(
   return lines.join('\n');
 }
 
+export function createJsonPlan(input: ScenarioInput, result: PlanResult, locale: Locale): string {
+  return JSON.stringify({
+    tool: { id: 'lease', name: translate(locale, 'export.title') },
+    locale,
+    scenario: input,
+    assessment: result,
+    privacy: translate(locale, 'privacy.description'),
+  }, null, 2);
+}
+
 export function formatDuration(hours: number, locale: Locale): string {
   const totalMinutes = Math.round(hours * 60);
   if (totalMinutes >= 1440 && totalMinutes % 1440 === 0) {
@@ -81,11 +91,22 @@ export function formatDuration(hours: number, locale: Locale): string {
 }
 
 export function downloadMarkdown(content: string, filename = 'dhcpulse-change-plan.md'): void {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  downloadFile(content, filename, 'text/markdown');
+}
+
+export function downloadJson(content: string, filename = 'dhcpulse-change-plan.json'): void {
+  downloadFile(content, filename, 'application/json');
+}
+
+function downloadFile(content: string, filename: string, type: string): void {
+  const blob = new Blob([content], { type: `${type};charset=utf-8` });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

@@ -209,11 +209,7 @@ describe('DHCPulse Workbench', () => {
 
   it('preserves the lease planner behavior, entered values, and export action', async () => {
     const user = userEvent.setup();
-    const createObjectUrl = vi.fn(() => 'blob:dhcpulse-plan');
-    const revokeObjectUrl = vi.fn();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl });
+    const downloads = captureDownloads();
     renderAt('#/tool/lease');
 
     await user.click(screen.getByRole('button', { name: /Unsafe overlap check/ }));
@@ -230,9 +226,20 @@ describe('DHCPulse Workbench', () => {
 
     const results = screen.getByRole('region', { name: 'Cutover-Ausblick' });
     await user.click(within(results).getByRole('button', { name: 'Markdown herunterladen' }));
-    expect(createObjectUrl).toHaveBeenCalledOnce();
-    expect(click).toHaveBeenCalledOnce();
-    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:dhcpulse-plan');
+    await user.click(within(results).getByRole('button', { name: 'JSON herunterladen' }));
+
+    expect(downloads.items).toHaveLength(2);
+    expect(downloads.items[0]?.filename).toBe('dhcpulse-change-plan.md');
+    expect(downloads.items[0]?.blob.type).toBe('text/markdown;charset=utf-8');
+    expect(await readBlob(downloads.items[0]!.blob)).toContain('**Gesch\u00e4tzte Clients:** 321');
+    expect(downloads.items[1]?.filename).toBe('dhcpulse-change-plan.json');
+    expect(downloads.items[1]?.blob.type).toBe('application/json;charset=utf-8');
+    expect(JSON.parse(await readBlob(downloads.items[1]!.blob))).toMatchObject({
+      tool: { id: 'lease' },
+      locale: 'de',
+      scenario: { clientCount: 321 },
+    });
+    expect(downloads.revokeObjectUrl).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the ready-to-plan default lease scenario', () => {
@@ -398,7 +405,7 @@ describe('DHCPulse Workbench', () => {
     const server = screen.getByRole('textbox', { name: 'Boot server' });
     await user.clear(server);
     await user.type(server, opaque);
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
+    await user.click(screen.getByRole('button', { name: 'Download Markdown' }));
 
     expect(reportBlob).toBeDefined();
     expect(await readBlob(reportBlob!)).not.toContain(opaque);
@@ -436,6 +443,16 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByText(/Router Advertisements supply the IPv6 default route/i)).toBeVisible();
   });
 
+  it('shows the DHCPv6 DNS delivery finding in both languages', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/dhcpv6');
+
+    await user.click(screen.getByRole('checkbox', { name: 'DNS option present' }));
+    expect(screen.getByText('DHCPv6 DNS delivery requires the Recursive Name Server option.')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByText('Die DHCPv6-DNS-Option fehlt f\u00fcr den ausgew\u00e4hlten Modus.')).toBeVisible();
+  });
+
   it('omits an opaque DHCPv6 relay address from the downloaded Markdown report', async () => {
     const user = userEvent.setup();
     const opaque = 'DHCPV6_PRIVATE_Q7Z_VALUE';
@@ -446,7 +463,7 @@ describe('DHCPulse Workbench', () => {
     renderAt('#/tool/dhcpv6');
     await user.click(screen.getByRole('checkbox', { name: 'DHCPv6 relay used' }));
     await user.type(screen.getByRole('textbox', { name: /^Relay link-address/ }), opaque);
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
+    await user.click(screen.getByRole('button', { name: 'Download Markdown' }));
 
     expect(reportBlob).toBeDefined();
     expect(await readBlob(reportBlob!)).not.toContain(opaque);
@@ -467,6 +484,41 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('heading', { name: 'Detect' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Recover' })).toBeVisible();
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
+  });
+
+  it('applies Windows DHCP authorization only to domain-joined Windows servers', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/security');
+
+    const platform = screen.getByRole('combobox', { name: 'Server platform' });
+    const directoryContext = screen.getByRole('combobox', { name: 'Active Directory context' });
+    expect(platform).toHaveValue('windows');
+    expect(directoryContext).toHaveValue('domain-joined');
+    expect(screen.getByText('Windows DHCP server is not authorized')).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Windows DHCP authorized' })).toBeVisible();
+
+    await user.selectOptions(platform, 'kea');
+    expect(directoryContext).toHaveValue('not-applicable');
+    expect(directoryContext).toBeDisabled();
+    expect(screen.queryByText('Windows DHCP server is not authorized')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Windows DHCP authorized' })).not.toBeInTheDocument();
+
+    await user.selectOptions(platform, 'windows');
+    await user.selectOptions(directoryContext, 'standalone');
+    expect(screen.queryByText('Windows DHCP server is not authorized')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Windows DHCP authorized' })).not.toBeInTheDocument();
+  });
+
+  it('localizes security platform and authorization applicability controls', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/security');
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+
+    const platform = screen.getByRole('combobox', { name: 'Serverplattform' });
+    expect(screen.getByRole('combobox', { name: 'Active-Directory-Kontext' })).toBeVisible();
+    await user.selectOptions(platform, 'dnsmasq');
+    expect(screen.getByText('Nicht anwendbar')).toBeVisible();
+    expect(screen.queryByText('Windows-DHCP-Server ist nicht autorisiert')).not.toBeInTheDocument();
   });
 
   it('analyzes pasted and file configurations, redacts preview data, and resets sensitive state', async () => {
@@ -586,18 +638,103 @@ describe('DHCPulse Workbench', () => {
     expect(screen.queryAllByText('Removed').filter((element) => element.tagName !== 'OPTION').length).toBeGreaterThan(0);
   });
 
-  it('downloads a local report and revokes its object URL immediately', async () => {
+  it('downloads Markdown and JSON reports with correct payloads for every ready workbench tool', async () => {
     const user = userEvent.setup();
-    const createObjectUrl = vi.fn(() => 'blob:scope-report');
-    const revokeObjectUrl = vi.fn();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl });
+    const downloads = captureDownloads();
+    const cases = [
+      ['scope', 'dhcpulse-scope-report'],
+      ['options', 'dhcpulse-options-report'],
+      ['pxe', 'dhcpulse-pxe-report'],
+      ['failover', 'dhcpulse-failover-report'],
+      ['dhcpv6', 'dhcpulse-dhcpv6-report'],
+      ['diagnostics', 'dhcpulse-diagnostics-report'],
+      ['security', 'dhcpulse-security-report'],
+    ] as const;
     renderAt('#/tool/scope');
-    await user.click(screen.getByRole('button', { name: 'Download report' }));
-    expect(createObjectUrl).toHaveBeenCalledOnce();
-    expect(click).toHaveBeenCalledOnce();
-    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:scope-report');
+
+    for (const [toolId, filename] of cases) {
+      if (window.location.hash !== `#/tool/${toolId}`) {
+        window.location.hash = `#/tool/${toolId}`;
+        fireEvent(window, new HashChangeEvent('hashchange'));
+      }
+      const before = downloads.items.length;
+      await user.click(screen.getByRole('button', { name: 'Download Markdown' }));
+      await user.click(screen.getByRole('button', { name: 'Download JSON' }));
+      const markdown = downloads.items[before]!;
+      const json = downloads.items[before + 1]!;
+
+      expect(markdown.filename).toBe(`${filename}.md`);
+      expect(markdown.blob.type).toBe('text/markdown;charset=utf-8');
+      expect(await readBlob(markdown.blob)).toContain(`Tool ID: ${toolId}`);
+      expect(json.filename).toBe(`${filename}.json`);
+      expect(json.blob.type).toBe('application/json;charset=utf-8');
+      expect(JSON.parse(await readBlob(json.blob))).toMatchObject({ tool: { id: toolId } });
+      expect(downloads.revokeObjectUrl).toHaveBeenCalledWith(`blob:download-${before + 1}`);
+      expect(downloads.revokeObjectUrl).toHaveBeenCalledWith(`blob:download-${before + 2}`);
+    }
+  });
+
+  it('downloads both report formats after analyzer and comparison results exist', async () => {
+    const user = userEvent.setup();
+    const downloads = captureDownloads();
+    renderAt('#/tool/config-analyzer');
+
+    await user.click(screen.getByRole('button', { name: 'Analyze configuration' }));
+    await user.click(screen.getByRole('button', { name: 'Download Markdown' }));
+    await user.click(screen.getByRole('button', { name: 'Download JSON' }));
+    expect(downloads.items[0]?.filename).toBe('dhcpulse-config-analysis.md');
+    expect(JSON.parse(await readBlob(downloads.items[1]!.blob))).toMatchObject({ tool: { id: 'config-analyzer' } });
+
+    window.location.hash = '#/tool/config-diff';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    await user.click(screen.getByRole('button', { name: 'Compare configurations' }));
+    await user.click(screen.getByRole('button', { name: 'Download Markdown' }));
+    await user.click(screen.getByRole('button', { name: 'Download JSON' }));
+    expect(downloads.items[2]?.filename).toBe('dhcpulse-config-diff.md');
+    expect(downloads.items[2]?.blob.type).toBe('text/markdown;charset=utf-8');
+    expect(downloads.items[3]?.filename).toBe('dhcpulse-config-diff.json');
+    expect(downloads.items[3]?.blob.type).toBe('application/json;charset=utf-8');
+    expect(JSON.parse(await readBlob(downloads.items[3]!.blob))).toMatchObject({ tool: { id: 'config-diff' } });
+    expect(downloads.revokeObjectUrl).toHaveBeenCalledTimes(4);
+  });
+
+  it('withholds Scope results and downloads for blank or non-integer lease inputs', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/scope');
+    const leases = screen.getByRole('spinbutton', { name: 'Current leases' });
+
+    await user.clear(leases);
+    expect(leases).toHaveAttribute('aria-invalid', 'true');
+    expect(leases).toHaveAccessibleDescription('Enter a finite nonnegative integer.');
+    expect(screen.queryByText('254', { selector: '.metric-value' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download Markdown' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download JSON' })).not.toBeInTheDocument();
+
+    await user.type(leases, '1.5');
+    expect(leases).toHaveAccessibleDescription('Enter a finite nonnegative integer.');
+    expect(screen.queryByText('254', { selector: '.metric-value' })).not.toBeInTheDocument();
+
+    await user.clear(leases);
+    await user.type(leases, '15');
+    const growth = screen.getByRole('spinbutton', { name: 'Expected daily growth' });
+    await user.clear(growth);
+    expect(growth).toHaveAccessibleDescription('Enter a finite nonnegative integer.');
+    expect(screen.queryByText('254', { selector: '.metric-value' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByRole('spinbutton', { name: /^Erwartetes t\u00e4gliches Wachstum/ })).toHaveAccessibleDescription('Gib eine endliche, nichtnegative ganze Zahl ein.');
+  });
+
+  it('keeps Scope CIDR and numeric validation messages distinct', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/scope');
+    const cidr = screen.getByRole('textbox', { name: 'CIDR' });
+
+    await user.clear(cidr);
+    await user.type(cidr, 'not-a-cidr');
+
+    expect(cidr).toHaveAccessibleDescription('Enter a valid IPv4 CIDR.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('renders complete German workbench copy without key fallbacks', async () => {
@@ -605,7 +742,8 @@ describe('DHCPulse Workbench', () => {
     renderAt('#/tool/config-analyzer');
     await user.click(screen.getByRole('button', { name: 'Deutsch' }));
     expect(screen.getByRole('button', { name: 'Konfiguration analysieren' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Bericht herunterladen' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Markdown herunterladen' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'JSON herunterladen' })).toBeVisible();
     expect(document.body).not.toHaveTextContent(/workbench\.[a-z]/i);
   });
 
@@ -674,4 +812,20 @@ function readBlob(blob: Blob): Promise<string> {
     reader.onload = () => resolve(String(reader.result));
     reader.readAsText(blob);
   });
+}
+
+function captureDownloads() {
+  const blobs: Blob[] = [];
+  const items: { blob: Blob; filename: string }[] = [];
+  const createObjectUrl = vi.fn((blob: Blob) => {
+    blobs.push(blob);
+    return `blob:download-${blobs.length}`;
+  });
+  const revokeObjectUrl = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function captureDownload(this: HTMLAnchorElement) {
+    items.push({ blob: blobs[items.length]!, filename: this.download });
+  });
+  return { items, createObjectUrl, revokeObjectUrl };
 }
