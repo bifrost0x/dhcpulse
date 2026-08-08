@@ -81,7 +81,7 @@ export const toolCatalog: ToolCatalogEntry[] = [
     group: 'analyze',
     availability: 'ready',
     name: { en: 'Configuration analyzer', de: 'Konfigurationsanalyse' },
-    description: { en: 'Inspect DHCP configuration for common risks.', de: 'DHCP-Konfiguration auf typische Risiken pruefen.' },
+    description: { en: 'Inspect DHCP configuration for common risks.', de: 'DHCP-Konfiguration auf typische Risiken prüfen.' },
   },
   {
     id: 'config-diff',

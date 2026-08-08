@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type MouseEvent } from 'react';
 import { translate, type Locale } from '../content/copy';
 import { toolCatalog, type ToolCatalogEntry } from '../content/tool-catalog';
 import { ConfigAnalyzerTool } from '../tools/ConfigAnalyzerTool';
@@ -46,13 +46,20 @@ interface WorkbenchShellProps {
 export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) {
   const [route, setRoute] = useState<Route>(() => routeFromHash(window.location.hash));
   const [leaseResetVersion, setLeaseResetVersion] = useState(0);
+  const routeHeadingRef = useRef<HTMLHeadingElement>(null);
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  const routeKey = route.kind === 'tool' ? `tool:${route.id}` : route.kind;
+  const routeHasFocusTarget = route.kind !== 'catalog';
 
   useEffect(() => {
     const updateRoute = () => setRoute(routeFromHash(window.location.hash));
     window.addEventListener('hashchange', updateRoute);
     return () => window.removeEventListener('hashchange', updateRoute);
   }, []);
+
+  useEffect(() => {
+    if (routeHasFocusTarget) routeHeadingRef.current?.focus();
+  }, [routeHasFocusTarget, routeKey]);
 
   function showCatalog() {
     setRoute({ kind: 'catalog' });
@@ -78,7 +85,7 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
     mainContent = (
       <section className="not-found planner-card">
         <p className="section-kicker">404</p>
-        <h1>{t('notFound.title')}</h1>
+        <h1 ref={routeHeadingRef} tabIndex={-1}>{t('notFound.title')}</h1>
         <p>{t('notFound.description')}</p>
         <a className="primary-button" href="#/" onClick={backFromNotFound}>{t('frame.back')}</a>
       </section>
@@ -87,14 +94,14 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
     const tool = toolCatalog.find(({ id }) => id === route.id)!;
     if (tool.id === 'lease') {
       mainContent = (
-        <ToolFrame locale={locale} tool={tool} onBack={showCatalog} onReset={() => setLeaseResetVersion((current) => current + 1)}>
+        <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setLeaseResetVersion((current) => current + 1)}>
           <LeaseTool key={leaseResetVersion} locale={locale} />
         </ToolFrame>
       );
     } else {
       const Panel = toolComponents[tool.id];
       mainContent = (
-        <ToolFrame locale={locale} tool={tool} onBack={showCatalog}>
+        <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog}>
           <Panel locale={locale} tool={tool} />
         </ToolFrame>
       );

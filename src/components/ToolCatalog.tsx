@@ -89,14 +89,13 @@ export function ToolCatalog({ locale, onToolSelect }: ToolCatalogProps) {
         <p className="tool-count" aria-live="polite">{interpolate(t('shell.toolCount'), { count: visibleTools.length })}</p>
       </div>
 
-      <div className="category-tabs" role="tablist" aria-label={t('catalog.filters')} aria-orientation="horizontal">
+      <div className="category-tabs" role="toolbar" aria-label={t('catalog.filters')} aria-orientation="horizontal">
         {categories.map((value, index) => (
           <button
             key={value}
             ref={(node) => { categoryRefs.current[index] = node; }}
             type="button"
-            role="tab"
-            aria-selected={category === value}
+            aria-pressed={category === value}
             tabIndex={category === value ? 0 : -1}
             onClick={() => setCategory(value)}
             onKeyDown={(event) => handleCategoryKey(event, index)}

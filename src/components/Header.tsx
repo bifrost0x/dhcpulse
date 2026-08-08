@@ -11,14 +11,14 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
 
   return (
     <header className="site-header">
-      <a className="brand" href="#top" aria-label="DHCPulse home">
+      <a className="brand" href="#top" aria-label={t('nav.home')}>
         <img src="./dhcpulse-mark.svg" alt="" width="38" height="38" />
         <span>
           <strong>{t('app.name')}</strong>
           <small>{t('app.tagline')}</small>
         </span>
       </a>
-      <nav aria-label="Primary">
+      <nav aria-label={t('nav.primary')}>
         <a className="header-link" href="https://github.com/bifrost0x/dhcpulse" target="_blank" rel="noreferrer">
           <GitFork size={17} aria-hidden="true" />
           <span>{t('nav.github')}</span>

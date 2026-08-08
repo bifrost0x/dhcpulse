@@ -1,5 +1,5 @@
 import { ArrowLeft, BookOpen, RotateCcw } from 'lucide-react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, ReactNode, Ref } from 'react';
 import { translate, type Locale } from '../content/copy';
 import type { ToolCatalogEntry } from '../content/tool-catalog';
 import { PrivacyNote } from './PrivacyNote';
@@ -8,11 +8,12 @@ interface ToolFrameProps {
   children: ReactNode;
   locale: Locale;
   tool: ToolCatalogEntry;
+  headingRef?: Ref<HTMLHeadingElement>;
   onBack: () => void;
   onReset?: () => void;
 }
 
-export function ToolFrame({ children, locale, tool, onBack, onReset }: ToolFrameProps) {
+export function ToolFrame({ children, locale, tool, headingRef, onBack, onReset }: ToolFrameProps) {
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
   const titleId = `tool-title-${tool.id}`;
 
@@ -26,7 +27,7 @@ export function ToolFrame({ children, locale, tool, onBack, onReset }: ToolFrame
       <header className="tool-frame-header">
         <div>
           <p className="section-kicker">{t(`catalog.group.${tool.group}`)}</p>
-          <h1 id={titleId}>{tool.name[locale]}</h1>
+          <h1 ref={headingRef} id={titleId} tabIndex={-1}>{tool.name[locale]}</h1>
           <p>{tool.description[locale]}</p>
         </div>
         <div className="tool-reset-slot">

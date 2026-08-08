@@ -5,6 +5,8 @@ const en = {
   'app.tagline': 'Local DHCP planning and analysis.',
   'nav.github': 'View source',
   'nav.language': 'Language',
+  'nav.home': 'DHCPulse home',
+  'nav.primary': 'Primary navigation',
   'shell.eyebrow': 'Private DHCP workbench',
   'shell.title': 'DHCPulse Workbench',
   'shell.description': 'Plan, build, analyze, troubleshoot, and secure DHCP changes. Your work stays in this browser and is never uploaded.',
@@ -188,7 +190,7 @@ export type CopyKey = keyof typeof en;
 const de: Record<CopyKey, string> = {
   ...en,
   'app.tagline': 'Lokale DHCP-Planung und -Analyse.',
-  'nav.github': 'Quellcode ansehen', 'nav.language': 'Sprache',
+  'nav.github': 'Quellcode ansehen', 'nav.language': 'Sprache', 'nav.home': 'DHCPulse Startseite', 'nav.primary': 'Hauptnavigation',
   'shell.eyebrow': 'Private DHCP-Workbench', 'shell.title': 'DHCPulse Workbench',
   'shell.description': 'Plane, erstelle, analysiere, diagnostiziere und sichere DHCP-Änderungen. Deine Arbeit bleibt in diesem Browser und wird nie hochgeladen.',
   'shell.toolCount': '{count} Tools bereit',

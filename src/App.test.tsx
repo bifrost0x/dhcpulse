@@ -77,6 +77,38 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByTestId('tool-panel-dhcpv6')).not.toBeEmptyDOMElement();
   });
 
+  it('moves keyboard focus to the route heading without stealing it on a locale-only change', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    const scopeLink = screen.getByRole('link', { name: /Scope and capacity/ });
+
+    scopeLink.focus();
+    await user.keyboard('{Enter}');
+
+    const heading = screen.getByRole('heading', { name: 'Scope and capacity' });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute('tabindex', '-1');
+
+    const germanButton = screen.getByRole('button', { name: 'Deutsch' });
+    germanButton.focus();
+    await user.keyboard('{Enter}');
+
+    expect(germanButton).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Bereich und Kapazität' })).not.toHaveFocus();
+  });
+
+  it('moves focus to the not-found heading after an invalid hash route', () => {
+    renderAt();
+    screen.getByRole('searchbox', { name: 'Search tools' }).focus();
+
+    window.location.hash = '#/tool/unknown';
+    fireEvent(window, new HashChangeEvent('hashchange'));
+
+    const heading = screen.getByRole('heading', { name: 'Tool not found' });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute('tabindex', '-1');
+  });
+
   it('shows a not-found route and returns to the catalog', async () => {
     const user = userEvent.setup();
     renderAt('#/tool/unknown');
@@ -88,30 +120,32 @@ describe('DHCPulse Workbench', () => {
 
   it('moves category selection and focus with wrapping keyboard controls', () => {
     renderAt();
-    const all = screen.getByRole('tab', { name: 'All tools' });
-    const plan = screen.getByRole('tab', { name: 'Plan' });
-    const secure = screen.getByRole('tab', { name: 'Secure' });
+    expect(screen.getByRole('toolbar', { name: 'Tool categories' })).toBeVisible();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    const all = screen.getByRole('button', { name: 'All tools' });
+    const plan = screen.getByRole('button', { name: 'Plan' });
+    const secure = screen.getByRole('button', { name: 'Secure' });
 
     all.focus();
     fireEvent.keyDown(all, { key: 'ArrowLeft' });
     expect(secure).toHaveFocus();
-    expect(secure).toHaveAttribute('aria-selected', 'true');
+    expect(secure).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.keyDown(secure, { key: 'ArrowRight' });
     expect(all).toHaveFocus();
-    expect(all).toHaveAttribute('aria-selected', 'true');
+    expect(all).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.keyDown(all, { key: 'End' });
     expect(secure).toHaveFocus();
-    expect(secure).toHaveAttribute('aria-selected', 'true');
+    expect(secure).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.keyDown(secure, { key: 'Home' });
     expect(all).toHaveFocus();
-    expect(all).toHaveAttribute('aria-selected', 'true');
+    expect(all).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.keyDown(all, { key: 'ArrowRight' });
     expect(plan).toHaveFocus();
-    expect(plan).toHaveAttribute('aria-selected', 'true');
+    expect(plan).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('preserves the lease planner behavior, entered values, and export action', async () => {
@@ -208,5 +242,16 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByText(/Processed only in this browser\. No data is uploaded\./)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Deutsch' }));
     expect(screen.getByText(/Nur lokal in diesem Browser verarbeitet\. Es werden keine Daten hochgeladen\./)).toBeVisible();
+  });
+
+  it('localizes Header landmark labels and polished German catalog copy', async () => {
+    const user = userEvent.setup();
+    renderAt();
+
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+
+    expect(screen.getByRole('link', { name: 'DHCPulse Startseite' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: 'Hauptnavigation' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /Konfigurationsanalyse/ })).toHaveTextContent('DHCP-Konfiguration auf typische Risiken prüfen.');
   });
 });
