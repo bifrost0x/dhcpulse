@@ -139,7 +139,6 @@ export function removeChangeOperation(
 
 export function validateChangeSet(workspace: MicrosoftWorkspace, set: DhcpChangeSet): ChangeSetResult {
   const issues: ChangeSetIssue[] = [];
-  if (!workspace.generation.enabled) addIssue(issues, undefined, 'workspace-generation-disabled', { reasonCount: workspace.generation.reasons.length });
   if (set.serverName !== workspace.serverName) addIssue(issues, undefined, 'server-mismatch', {});
   const ids = new Set<string>();
   const conflicts = new Map<string, string>();

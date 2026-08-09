@@ -8,7 +8,7 @@ It is useful when you need an explainable second opinion without sending product
 
 | Tool | Practical use |
 | --- | --- |
-| Microsoft DHCP Config Workspace | Open an `Export-DhcpServer` XML file as a linked object workspace, review findings, stage validated object-specific changes, and generate guarded Preflight, Apply, Verify, and Rollback PowerShell artifacts. |
+| Microsoft DHCP Config Workspace | Open an `Export-DhcpServer` XML file as a scope-first estate, search across owned objects, review grouped findings in paginated scope details, stage validated object-specific changes, and generate guarded Preflight, Apply, Verify, and Rollback PowerShell artifacts. |
 | Scope and capacity | Design IPv4 pools, exclusions, reservations, and capacity margins. |
 | Lease transition | Model T1, T2, expiry, client waves, cutover risks, and rollback steps. |
 | DHCP options | Find, encode, decode, and validate common DHCPv4 and DHCPv6 options. |
@@ -22,7 +22,9 @@ It is useful when you need an explainable second opinion without sending product
 
 All tools run in the browser. Reports are assembled locally and downloaded through a temporary object URL. Imported-configuration reports are redacted by default.
 
-The Microsoft workspace is deliberately different from the standalone planners: it starts with the administrator's existing configuration and exposes actions only for the selected supported object. Generated change packages contain real infrastructure values, execute nothing automatically, and must be reviewed and tested before use. The package includes a human-readable change record, the immutable change set, and a SHA-256 manifest alongside the four PowerShell phases.
+The Microsoft workspace is deliberately different from the standalone planners: it starts with the administrator's existing configuration and presents a compact scope table instead of dumping every imported object. Search results retain their owning-scope context; reservations, options, and findings load only in the active scope tab, with at most 50 list rows per page. Import coverage, assessment findings, and target-specific package eligibility are shown separately. Generated change packages contain real infrastructure values, execute nothing automatically, and must be reviewed and tested before use. The package includes a human-readable change record, the immutable change set, and a SHA-256 manifest alongside the four PowerShell phases.
+
+A large, entirely synthetic Microsoft export is available in [`samples/`](samples/) for regression and upload testing.
 
 ## Configuration imports
 

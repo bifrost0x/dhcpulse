@@ -7,6 +7,7 @@ import type {
 } from './dhcp-change-set';
 import type { DhcpConfiguration, DhcpOption, DhcpScope } from './config-model';
 import type { MicrosoftWorkspace } from './microsoft-workspace';
+import { evaluatePackageEligibility } from './workspace-view';
 
 export type GeneratedArtifactName =
   | '01-Preflight.ps1'
@@ -56,6 +57,9 @@ export async function generatePowerShellPackage(
     throw new Error('A valid single-line server name is required.');
   }
   if (!Number.isFinite(generatedAt.getTime())) throw new Error('A valid generation timestamp is required.');
+  if (!evaluatePackageEligibility(workspace, result).eligible) {
+    throw new Error('The change set is not eligible for package generation.');
+  }
 
   const fragments = result.changeSet.operations.map((operation) => operationFragments(workspace.configuration, operation));
   const artifacts: GeneratedArtifact[] = [

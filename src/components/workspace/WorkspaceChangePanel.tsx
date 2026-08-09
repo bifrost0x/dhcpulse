@@ -10,6 +10,7 @@ import {
 } from '../../domain/dhcp-change-set';
 import type { MicrosoftWorkspace, WorkspaceNode } from '../../domain/microsoft-workspace';
 import { generatePowerShellPackage, type PowerShellPackage } from '../../domain/powershell-package';
+import { evaluatePackageEligibility } from '../../domain/workspace-view';
 
 interface Props {
   locale: Locale;
@@ -19,6 +20,7 @@ interface Props {
 
 const copy = {
   en: {
+    eligibility: 'Package eligibility', eligible: 'Eligible for the selected targets.', ineligible: 'Package generation is blocked for the selected targets.',
     editor: 'Contextual change', select: 'Select an IPv4 scope to stage a supported change.', lease: 'Lease duration in hours',
     stage: 'Stage lease change', set: 'Change Set', empty: 'No changes staged yet.', remove: 'Remove', invalid: 'Enter a positive whole number of hours.',
     valid: 'Validated and ready for package generation.', blocked: 'Resolve the validation errors before generating a package.', generate: 'Generate guarded package',
@@ -26,6 +28,7 @@ const copy = {
     removeExclusion: 'Stage exclusion removal', removeReservation: 'Stage reservation removal', removeOption: 'Stage option removal', destructiveHint: 'This only stages a reversible change; nothing is executed.',
   },
   de: {
+    eligibility: 'Paketfreigabe', eligible: 'Für die gewählten Ziel-Scopes freigegeben.', ineligible: 'Die Paketerzeugung ist für die gewählten Ziel-Scopes blockiert.',
     editor: 'Kontextbezogene Änderung', select: 'Wähle einen IPv4-Scope aus, um eine unterstützte Änderung vorzumerken.', lease: 'Leasedauer in Stunden',
     stage: 'Lease-Änderung vormerken', set: 'Change Set', empty: 'Noch keine Änderungen vorgemerkt.', remove: 'Entfernen', invalid: 'Gib eine positive ganze Stundenzahl ein.',
     valid: 'Validiert und bereit für die Paketerzeugung.', blocked: 'Behebe die Validierungsfehler vor der Paketerzeugung.', generate: 'Abgesichertes Paket erzeugen',
@@ -45,6 +48,7 @@ export function WorkspaceChangePanel({ locale, workspace, selected }: Props) {
   const reservation = selected?.kind === 'reservation' ? workspace.configuration.reservations.find(({ id }) => id === selected.id) : undefined;
   const option = selected?.kind === 'option' ? workspace.configuration.options.find(({ id }) => id === selected.id) : undefined;
   const leaseHours = scope && leaseDraft?.scopeId === scope.id ? leaseDraft.value : scope?.leaseLifetimeSeconds ? String(scope.leaseLifetimeSeconds / 3600) : '';
+  const eligibility = useMemo(() => evaluatePackageEligibility(workspace, result), [result, workspace]);
 
   function stageLease() {
     if (!scope) return;
@@ -71,6 +75,7 @@ export function WorkspaceChangePanel({ locale, workspace, selected }: Props) {
   }
 
   async function generate() {
+    if (!eligibility.eligible) return;
     setGenerated(await generatePowerShellPackage(workspace, result, locale, new Date()));
   }
 
@@ -100,7 +105,8 @@ export function WorkspaceChangePanel({ locale, workspace, selected }: Props) {
         {result.changeSet.operations.length === 0 ? <p>{c.empty}</p> : <ol>{result.changeSet.operations.map((operation) => <li key={operation.id}><div><strong>{operation.kind}</strong>{operation.kind === 'scope-lease.set' && <span>{operation.beforeSeconds / 3600} hours → {operation.afterSeconds / 3600} hours</span>}</div><button type="button" className="text-button" onClick={() => { setGenerated(null); setResult(removeChangeOperation(workspace, result.changeSet, operation.id)); }}>{c.remove}</button></li>)}</ol>}
         {result.issues.length > 0 && <ul className="workspace-change-issues">{result.issues.map((issue) => <li key={`${issue.operationId ?? 'set'}-${issue.code}`}>{issue.code}</li>)}</ul>}
         {result.changeSet.operations.length > 0 && <p className={result.valid ? 'validation-ok' : 'field-error'}>{result.valid ? c.valid : c.blocked}</p>}
-        <button type="button" className="primary-button" disabled={!result.valid || result.changeSet.operations.length === 0} onClick={() => void generate()}>{c.generate}</button>
+        <div className={`workspace-package-eligibility ${eligibility.eligible ? 'eligible' : 'blocked'}`}><span>{c.eligibility}</span><strong>{eligibility.eligible ? c.eligible : c.ineligible}</strong>{eligibility.blockers.length > 0 && <ul>{eligibility.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>}</div>
+        <button type="button" className="primary-button" disabled={!eligibility.eligible} onClick={() => void generate()}>{c.generate}</button>
       </section>
       {generated && <section className="workspace-package planner-card" aria-labelledby="workspace-package-heading"><p className="section-kicker">3 · Package</p><h2 id="workspace-package-heading">{c.generated}</h2><p>{c.safety}</p><div className="workspace-artifacts">{generated.artifacts.map((artifact) => <button type="button" className="secondary-button" key={artifact.name} onClick={() => download(artifact.name, artifact.mimeType, artifact.content)}>{c.download} {artifact.name}</button>)}</div></section>}
     </div>

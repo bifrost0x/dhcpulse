@@ -1,9 +1,8 @@
 import { FileCode2, FolderOpen, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { WorkspaceFindings } from '../components/workspace/WorkspaceFindings';
 import { WorkspaceChangePanel } from '../components/workspace/WorkspaceChangePanel';
-import { WorkspaceNavigation } from '../components/workspace/WorkspaceNavigation';
-import { WorkspaceObjectView } from '../components/workspace/WorkspaceObjectView';
+import { WorkspaceEstateOverview } from '../components/workspace/WorkspaceEstateOverview';
+import { WorkspaceScopeDetail } from '../components/workspace/WorkspaceScopeDetail';
 import { ConfigImportError, importDhcpConfiguration } from '../domain/config-import';
 import { buildMicrosoftWorkspace, type MicrosoftWorkspace } from '../domain/microsoft-workspace';
 import type { ToolPanelProps } from './ToolPanel';
@@ -37,7 +36,8 @@ const copy = {
 export function MicrosoftWorkspaceTool({ locale }: ToolPanelProps) {
   const c = copy[locale];
   const [workspace, setWorkspace] = useState<MicrosoftWorkspace | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
   const [fileKey, setFileKey] = useState(0);
@@ -45,22 +45,24 @@ export function MicrosoftWorkspaceTool({ locale }: ToolPanelProps) {
   const generation = useRef(0);
   const overviewHeadingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => () => { generation.current += 1; }, []);
-  useEffect(() => { if (workspace) overviewHeadingRef.current?.focus(); }, [workspace]);
+  useEffect(() => { if (workspace && !selectedScopeId) overviewHeadingRef.current?.focus(); }, [selectedScopeId, workspace]);
 
-  const selected = useMemo(() => workspace?.nodes.find(({ id }) => id === selectedId) ?? null, [selectedId, workspace]);
+  const selected = useMemo(() => workspace?.nodes.find(({ id }) => id === selectedObjectId) ?? null, [selectedObjectId, workspace]);
 
   function open(content: string, name: string) {
     try {
       const imported = importDhcpConfiguration({ text: content, fileName: name, format: 'microsoft-xml' });
       const next = buildMicrosoftWorkspace(imported.configuration);
       setWorkspace(next);
-      setSelectedId(null);
+      setSelectedScopeId(null);
+      setSelectedObjectId(null);
       setFileName(name);
       setPastedXml('');
       setError('');
     } catch (caught) {
       setWorkspace(null);
-      setSelectedId(null);
+      setSelectedScopeId(null);
+      setSelectedObjectId(null);
       setFileName('');
       setError(caught instanceof ConfigImportError ? c.importError : c.importError);
     }
@@ -69,7 +71,8 @@ export function MicrosoftWorkspaceTool({ locale }: ToolPanelProps) {
   async function onFile(file: File | undefined) {
     const token = ++generation.current;
     setWorkspace(null);
-    setSelectedId(null);
+    setSelectedScopeId(null);
+    setSelectedObjectId(null);
     setError('');
     setFileName('');
     if (!file) return;
@@ -90,7 +93,8 @@ export function MicrosoftWorkspaceTool({ locale }: ToolPanelProps) {
   function reset() {
     generation.current += 1;
     setWorkspace(null);
-    setSelectedId(null);
+    setSelectedScopeId(null);
+    setSelectedObjectId(null);
     setFileName('');
     setError('');
     setPastedXml('');
@@ -124,11 +128,7 @@ export function MicrosoftWorkspaceTool({ locale }: ToolPanelProps) {
         <button type="button" className="secondary-button" onClick={reset}><RotateCcw size={16} aria-hidden="true" />{c.reset}</button>
       </header>
       <aside className="workspace-limitation"><strong>{c.limitations}</strong><span>{c.partial}</span></aside>
-      <div className="workspace-layout">
-        <WorkspaceNavigation locale={locale} workspace={workspace} selectedId={selectedId} onSelect={setSelectedId} />
-        <WorkspaceObjectView locale={locale} workspace={workspace} selected={selected} overviewHeadingRef={overviewHeadingRef} />
-        <WorkspaceFindings locale={locale} workspace={workspace} selectedId={selectedId} onSelect={setSelectedId} />
-      </div>
+      {!selectedScopeId ? <WorkspaceEstateOverview locale={locale} workspace={workspace} headingRef={overviewHeadingRef} onOpenScope={(scopeId, objectId) => { setSelectedScopeId(scopeId); setSelectedObjectId(objectId ?? scopeId); }} /> : <WorkspaceScopeDetail locale={locale} workspace={workspace} scopeId={selectedScopeId} selectedObjectId={selectedObjectId} onBack={() => { setSelectedScopeId(null); setSelectedObjectId(null); }} onSelectObject={(node) => setSelectedObjectId(node.id)} />}
       <WorkspaceChangePanel locale={locale} workspace={workspace} selected={selected} />
     </div>
   );

@@ -1,0 +1,586 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DhcpServerExport Version="2026.08-synthetic">
+  <Server>
+    <Name>dhcp01.lab.example</Name>
+    <Address>192.0.2.2</Address>
+    <AuditLog><Enable>true</Enable><Path>C:\DHCPulse-Synthetic-Audit</Path></AuditLog>
+  </Server>
+  <IPv4>
+    <OptionValues>
+      <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>192.0.2.53</Value><Value>198.51.100.53</Value></OptionValue>
+      <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>lab.example</Value></OptionValue>
+      <OptionValue><OptionId>42</OptionId><Name>NTP Servers</Name><Value>192.0.2.42</Value></OptionValue>
+      <OptionValue><OptionId>66</OptionId><Name>Boot Server</Name><Value>pxe.lab.example</Value></OptionValue>
+      <OptionValue><OptionId>67</OptionId><Name>Boot File</Name><Value>boot\x64\wdsmgfw.efi</Value></OptionValue>
+    </OptionValues>
+    <Scopes>
+      <Scope>
+        <ScopeId>192.0.2.0</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Office VLAN 100</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>192.0.2.5</StartRange><EndRange>192.0.2.55</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>192.0.2.10</StartRange><EndRange>192.0.2.12</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>192.0.2.20</StartRange><EndRange>192.0.2.21</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>192.0.2.6</IPAddress><ClientId>02-00-5E-00-00-00</ClientId><Name>device-001.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.7</IPAddress><ClientId>02-00-5E-00-01-01</ClientId><Name>device-002.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.8</IPAddress><ClientId>02-00-5E-00-02-02</ClientId><Name>device-003.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.9</IPAddress><ClientId>02-00-5E-00-03-03</ClientId><Name>device-004.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.10</IPAddress><ClientId>02-00-5E-00-04-04</ClientId><Name>device-005.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.11</IPAddress><ClientId>02-00-5E-00-05-05</ClientId><Name>device-006.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.12</IPAddress><ClientId>02-00-5E-00-06-06</ClientId><Name>device-007.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.13</IPAddress><ClientId>02-00-5E-00-07-07</ClientId><Name>device-008.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.14</IPAddress><ClientId>02-00-5E-00-08-08</ClientId><Name>device-009.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.15</IPAddress><ClientId>02-00-5E-00-09-09</ClientId><Name>device-010.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.16</IPAddress><ClientId>02-00-5E-00-0A-0A</ClientId><Name>device-011.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.17</IPAddress><ClientId>02-00-5E-00-0B-0B</ClientId><Name>device-012.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.18</IPAddress><ClientId>02-00-5E-00-0C-0C</ClientId><Name>device-013.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.19</IPAddress><ClientId>02-00-5E-00-0D-0D</ClientId><Name>device-014.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.20</IPAddress><ClientId>02-00-5E-00-0E-0E</ClientId><Name>device-015.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.21</IPAddress><ClientId>02-00-5E-00-0F-0F</ClientId><Name>device-016.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.22</IPAddress><ClientId>02-00-5E-00-10-10</ClientId><Name>device-017.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.23</IPAddress><ClientId>02-00-5E-00-11-11</ClientId><Name>device-018.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.24</IPAddress><ClientId>02-00-5E-00-12-12</ClientId><Name>device-019.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.25</IPAddress><ClientId>02-00-5E-00-13-13</ClientId><Name>device-020.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.26</IPAddress><ClientId>02-00-5E-00-14-14</ClientId><Name>device-021.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.27</IPAddress><ClientId>02-00-5E-00-15-15</ClientId><Name>device-022.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.28</IPAddress><ClientId>02-00-5E-00-16-16</ClientId><Name>device-023.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.29</IPAddress><ClientId>02-00-5E-00-17-17</ClientId><Name>device-024.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.250</IPAddress><ClientId>02-00-5E-00-18-18</ClientId><Name>device-025.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>192.0.2.8</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>192.0.2.2,192.0.2.3</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-100.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Office managed clients</Name><Condition>VendorClass EQ DHCPulse-Office</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>192.0.2.64</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Voice VLAN 101</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>192.0.2.69</StartRange><EndRange>192.0.2.119</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>192.0.2.74</StartRange><EndRange>192.0.2.76</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>192.0.2.84</StartRange><EndRange>192.0.2.85</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>192.0.2.6</IPAddress><ClientId>02-00-5E-01-00-1D</ClientId><Name>device-026.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.71</IPAddress><ClientId>02-00-5E-01-01-1E</ClientId><Name>device-027.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.72</IPAddress><ClientId>02-00-5E-01-02-1F</ClientId><Name>device-028.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.73</IPAddress><ClientId>02-00-5E-01-03-20</ClientId><Name>device-029.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.74</IPAddress><ClientId>02-00-5E-01-04-21</ClientId><Name>device-030.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.75</IPAddress><ClientId>02-00-5E-01-05-22</ClientId><Name>device-031.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.76</IPAddress><ClientId>02-00-5E-01-06-23</ClientId><Name>device-032.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.77</IPAddress><ClientId>02-00-5E-01-07-24</ClientId><Name>device-033.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.78</IPAddress><ClientId>02-00-5E-01-08-25</ClientId><Name>device-034.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.79</IPAddress><ClientId>02-00-5E-01-09-26</ClientId><Name>device-035.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.80</IPAddress><ClientId>02-00-5E-01-0A-27</ClientId><Name>device-036.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.81</IPAddress><ClientId>02-00-5E-01-0B-28</ClientId><Name>device-037.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.82</IPAddress><ClientId>02-00-5E-01-0C-29</ClientId><Name>device-038.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.83</IPAddress><ClientId>02-00-5E-01-0D-2A</ClientId><Name>device-039.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.84</IPAddress><ClientId>02-00-5E-01-0E-2B</ClientId><Name>device-040.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.85</IPAddress><ClientId>02-00-5E-01-0F-2C</ClientId><Name>device-041.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.86</IPAddress><ClientId>02-00-5E-01-10-2D</ClientId><Name>device-042.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.87</IPAddress><ClientId>02-00-5E-01-11-2E</ClientId><Name>device-043.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.88</IPAddress><ClientId>02-00-5E-01-12-2F</ClientId><Name>device-044.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.89</IPAddress><ClientId>02-00-5E-01-13-30</ClientId><Name>device-045.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.90</IPAddress><ClientId>02-00-5E-01-14-31</ClientId><Name>device-046.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.91</IPAddress><ClientId>02-00-5E-01-15-32</ClientId><Name>device-047.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.92</IPAddress><ClientId>02-00-5E-01-16-33</ClientId><Name>device-048.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.93</IPAddress><ClientId>02-00-5E-01-17-34</ClientId><Name>device-049.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.94</IPAddress><ClientId>02-00-5E-01-18-35</ClientId><Name>device-050.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>192.0.2.65</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>192.0.2.66,192.0.2.67</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-101.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Voice managed clients</Name><Condition>VendorClass EQ DHCPulse-Voice</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>192.0.2.128</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Wireless VLAN 102</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>192.0.2.133</StartRange><EndRange>192.0.2.183</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>192.0.2.138</StartRange><EndRange>192.0.2.140</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>192.0.2.148</StartRange><EndRange>192.0.2.149</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>192.0.2.134</IPAddress><ClientId>02-00-5E-02-00-3A</ClientId><Name>device-051.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.135</IPAddress><ClientId>02-00-5E-00-01-01</ClientId><Name>device-052.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.136</IPAddress><ClientId>02-00-5E-02-02-3C</ClientId><Name>device-053.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.137</IPAddress><ClientId>02-00-5E-02-03-3D</ClientId><Name>device-054.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.138</IPAddress><ClientId>02-00-5E-02-04-3E</ClientId><Name>device-055.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.139</IPAddress><ClientId>02-00-5E-02-05-3F</ClientId><Name>device-056.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.140</IPAddress><ClientId>02-00-5E-02-06-40</ClientId><Name>device-057.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.141</IPAddress><ClientId>02-00-5E-02-07-41</ClientId><Name>device-058.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.142</IPAddress><ClientId>02-00-5E-02-08-42</ClientId><Name>device-059.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.143</IPAddress><ClientId>02-00-5E-02-09-43</ClientId><Name>device-060.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.144</IPAddress><ClientId>02-00-5E-02-0A-44</ClientId><Name>device-061.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.145</IPAddress><ClientId>02-00-5E-02-0B-45</ClientId><Name>device-062.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.146</IPAddress><ClientId>02-00-5E-02-0C-46</ClientId><Name>device-063.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.147</IPAddress><ClientId>02-00-5E-02-0D-47</ClientId><Name>device-064.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.148</IPAddress><ClientId>02-00-5E-02-0E-48</ClientId><Name>device-065.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.149</IPAddress><ClientId>02-00-5E-02-0F-49</ClientId><Name>device-066.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.150</IPAddress><ClientId>02-00-5E-02-10-4A</ClientId><Name>device-067.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.151</IPAddress><ClientId>02-00-5E-02-11-4B</ClientId><Name>device-068.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.152</IPAddress><ClientId>02-00-5E-02-12-4C</ClientId><Name>device-069.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.153</IPAddress><ClientId>02-00-5E-02-13-4D</ClientId><Name>device-070.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.154</IPAddress><ClientId>02-00-5E-02-14-4E</ClientId><Name>device-071.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.155</IPAddress><ClientId>02-00-5E-02-15-4F</ClientId><Name>device-072.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.156</IPAddress><ClientId>02-00-5E-02-16-50</ClientId><Name>device-073.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.157</IPAddress><ClientId>02-00-5E-02-17-51</ClientId><Name>device-074.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.158</IPAddress><ClientId>02-00-5E-02-18-52</ClientId><Name>device-075.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>192.0.2.129</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>192.0.2.130,192.0.2.131</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-102.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Wireless managed clients</Name><Condition>VendorClass EQ DHCPulse-Wireless</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>192.0.2.192</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Printers VLAN 103</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>192.0.2.197</StartRange><EndRange>192.0.2.247</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>192.0.2.202</StartRange><EndRange>192.0.2.204</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>192.0.2.212</StartRange><EndRange>192.0.2.213</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>192.0.2.198</IPAddress><ClientId>02-00-5E-03-00-57</ClientId><Name>device-076.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.199</IPAddress><ClientId>02-00-5E-03-01-58</ClientId><Name>device-077.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.200</IPAddress><ClientId>02-00-5E-03-02-59</ClientId><Name>device-078.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.201</IPAddress><ClientId>02-00-5E-03-03-5A</ClientId><Name>device-079.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.202</IPAddress><ClientId>02-00-5E-03-04-5B</ClientId><Name>device-080.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.203</IPAddress><ClientId>02-00-5E-03-05-5C</ClientId><Name>device-081.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.204</IPAddress><ClientId>02-00-5E-03-06-5D</ClientId><Name>device-082.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.205</IPAddress><ClientId>02-00-5E-03-07-5E</ClientId><Name>device-083.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.206</IPAddress><ClientId>02-00-5E-03-08-5F</ClientId><Name>device-084.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.207</IPAddress><ClientId>02-00-5E-03-09-60</ClientId><Name>device-085.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.208</IPAddress><ClientId>02-00-5E-03-0A-61</ClientId><Name>device-086.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.209</IPAddress><ClientId>02-00-5E-03-0B-62</ClientId><Name>device-087.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.210</IPAddress><ClientId>02-00-5E-03-0C-63</ClientId><Name>device-088.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.211</IPAddress><ClientId>02-00-5E-03-0D-64</ClientId><Name>device-089.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.212</IPAddress><ClientId>02-00-5E-03-0E-65</ClientId><Name>device-090.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.213</IPAddress><ClientId>02-00-5E-03-0F-66</ClientId><Name>device-091.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.214</IPAddress><ClientId>02-00-5E-03-10-67</ClientId><Name>device-092.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.215</IPAddress><ClientId>02-00-5E-03-11-68</ClientId><Name>device-093.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.216</IPAddress><ClientId>02-00-5E-03-12-69</ClientId><Name>device-094.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.217</IPAddress><ClientId>02-00-5E-03-13-6A</ClientId><Name>device-095.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.218</IPAddress><ClientId>02-00-5E-03-14-6B</ClientId><Name>device-096.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.219</IPAddress><ClientId>02-00-5E-03-15-6C</ClientId><Name>device-097.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.220</IPAddress><ClientId>02-00-5E-03-16-6D</ClientId><Name>device-098.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.221</IPAddress><ClientId>02-00-5E-03-17-6E</ClientId><Name>device-099.lab.example</Name></Reservation>
+          <Reservation><IPAddress>192.0.2.222</IPAddress><ClientId>02-00-5E-03-18-6F</ClientId><Name>device-100.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>192.0.2.193</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>not-an-ip</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-103.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Printers managed clients</Name><Condition>VendorClass EQ DHCPulse-Printers</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>198.51.100.0</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Engineering VLAN 104</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>198.51.100.5</StartRange><EndRange>198.51.100.55</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>198.51.100.10</StartRange><EndRange>198.51.100.12</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>198.51.100.20</StartRange><EndRange>198.51.100.21</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>198.51.100.6</IPAddress><ClientId>02-00-5E-04-00-74</ClientId><Name>device-101.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.7</IPAddress><ClientId>02-00-5E-04-01-75</ClientId><Name>device-102.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.8</IPAddress><ClientId>02-00-5E-04-02-76</ClientId><Name>device-103.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.9</IPAddress><ClientId>02-00-5E-04-03-77</ClientId><Name>device-104.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.10</IPAddress><ClientId>02-00-5E-04-04-78</ClientId><Name>device-105.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.11</IPAddress><ClientId>02-00-5E-04-05-79</ClientId><Name>device-106.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.12</IPAddress><ClientId>02-00-5E-04-06-7A</ClientId><Name>device-107.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.13</IPAddress><ClientId>02-00-5E-04-07-7B</ClientId><Name>device-108.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.14</IPAddress><ClientId>02-00-5E-04-08-7C</ClientId><Name>device-109.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.15</IPAddress><ClientId>02-00-5E-04-09-7D</ClientId><Name>device-110.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.16</IPAddress><ClientId>02-00-5E-04-0A-7E</ClientId><Name>device-111.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.17</IPAddress><ClientId>02-00-5E-04-0B-7F</ClientId><Name>device-112.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.18</IPAddress><ClientId>02-00-5E-04-0C-80</ClientId><Name>device-113.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.19</IPAddress><ClientId>02-00-5E-04-0D-81</ClientId><Name>device-114.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.20</IPAddress><ClientId>02-00-5E-04-0E-82</ClientId><Name>device-115.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.21</IPAddress><ClientId>02-00-5E-04-0F-83</ClientId><Name>device-116.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.22</IPAddress><ClientId>02-00-5E-04-10-84</ClientId><Name>device-117.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.23</IPAddress><ClientId>02-00-5E-04-11-85</ClientId><Name>device-118.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.24</IPAddress><ClientId>02-00-5E-04-12-86</ClientId><Name>device-119.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.25</IPAddress><ClientId>02-00-5E-04-13-87</ClientId><Name>device-120.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.26</IPAddress><ClientId>02-00-5E-04-14-88</ClientId><Name>device-121.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.27</IPAddress><ClientId>02-00-5E-04-15-89</ClientId><Name>device-122.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.28</IPAddress><ClientId>02-00-5E-04-16-8A</ClientId><Name>device-123.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.29</IPAddress><ClientId>02-00-5E-04-17-8B</ClientId><Name>device-124.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.30</IPAddress><ClientId>02-00-5E-04-18-8C</ClientId><Name>device-125.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>198.51.100.1</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>198.51.100.2,198.51.100.3</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-104.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Engineering managed clients</Name><Condition>VendorClass EQ DHCPulse-Engineering</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>198.51.100.64</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Operations VLAN 105</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>198.51.100.69</StartRange><EndRange>198.51.100.119</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>198.51.100.74</StartRange><EndRange>198.51.100.76</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>198.51.100.84</StartRange><EndRange>198.51.100.85</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>198.51.100.70</IPAddress><ClientId>02-00-5E-05-00-91</ClientId><Name>device-126.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.71</IPAddress><ClientId>02-00-5E-05-01-92</ClientId><Name>device-127.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.72</IPAddress><ClientId>02-00-5E-05-02-93</ClientId><Name>device-128.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.73</IPAddress><ClientId>02-00-5E-05-03-94</ClientId><Name>device-129.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.74</IPAddress><ClientId>02-00-5E-05-04-95</ClientId><Name>device-130.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.75</IPAddress><ClientId>02-00-5E-05-05-96</ClientId><Name>device-131.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.76</IPAddress><ClientId>02-00-5E-05-06-97</ClientId><Name>device-132.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.77</IPAddress><ClientId>02-00-5E-05-07-98</ClientId><Name>device-133.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.78</IPAddress><ClientId>02-00-5E-05-08-99</ClientId><Name>device-134.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.79</IPAddress><ClientId>02-00-5E-05-09-9A</ClientId><Name>device-135.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.80</IPAddress><ClientId>02-00-5E-05-0A-9B</ClientId><Name>device-136.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.81</IPAddress><ClientId>02-00-5E-05-0B-9C</ClientId><Name>device-137.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.82</IPAddress><ClientId>02-00-5E-05-0C-9D</ClientId><Name>device-138.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.83</IPAddress><ClientId>02-00-5E-05-0D-9E</ClientId><Name>device-139.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.84</IPAddress><ClientId>02-00-5E-05-0E-9F</ClientId><Name>device-140.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.85</IPAddress><ClientId>02-00-5E-05-0F-A0</ClientId><Name>device-141.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.86</IPAddress><ClientId>02-00-5E-05-10-A1</ClientId><Name>device-142.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.87</IPAddress><ClientId>02-00-5E-05-11-A2</ClientId><Name>device-143.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.88</IPAddress><ClientId>02-00-5E-05-12-A3</ClientId><Name>device-144.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.89</IPAddress><ClientId>02-00-5E-05-13-A4</ClientId><Name>device-145.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.90</IPAddress><ClientId>02-00-5E-05-14-A5</ClientId><Name>device-146.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.91</IPAddress><ClientId>02-00-5E-05-15-A6</ClientId><Name>device-147.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.92</IPAddress><ClientId>02-00-5E-05-16-A7</ClientId><Name>device-148.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.93</IPAddress><ClientId>02-00-5E-05-17-A8</ClientId><Name>device-149.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.94</IPAddress><ClientId>02-00-5E-05-18-A9</ClientId><Name>device-150.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>198.51.100.65</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>198.51.100.66,198.51.100.67</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-105.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Operations managed clients</Name><Condition>VendorClass EQ DHCPulse-Operations</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>198.51.100.128</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Guest VLAN 106</Name>
+        <State>Active</State>
+        <LeaseDuration>00:30:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>198.51.100.133</StartRange><EndRange>198.51.100.183</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>198.51.100.138</StartRange><EndRange>198.51.100.140</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>198.51.100.148</StartRange><EndRange>198.51.100.149</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>198.51.100.134</IPAddress><ClientId>02-00-5E-06-00-AE</ClientId><Name>device-151.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.135</IPAddress><ClientId>02-00-5E-06-01-AF</ClientId><Name>device-152.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.136</IPAddress><ClientId>02-00-5E-06-02-B0</ClientId><Name>device-153.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.137</IPAddress><ClientId>02-00-5E-06-03-B1</ClientId><Name>device-154.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.138</IPAddress><ClientId>02-00-5E-06-04-B2</ClientId><Name>device-155.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.139</IPAddress><ClientId>02-00-5E-06-05-B3</ClientId><Name>device-156.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.140</IPAddress><ClientId>02-00-5E-06-06-B4</ClientId><Name>device-157.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.141</IPAddress><ClientId>02-00-5E-06-07-B5</ClientId><Name>device-158.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.142</IPAddress><ClientId>02-00-5E-06-08-B6</ClientId><Name>device-159.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.143</IPAddress><ClientId>02-00-5E-06-09-B7</ClientId><Name>device-160.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.144</IPAddress><ClientId>02-00-5E-06-0A-B8</ClientId><Name>device-161.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.145</IPAddress><ClientId>02-00-5E-06-0B-B9</ClientId><Name>device-162.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.146</IPAddress><ClientId>02-00-5E-06-0C-BA</ClientId><Name>device-163.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.147</IPAddress><ClientId>02-00-5E-06-0D-BB</ClientId><Name>device-164.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.148</IPAddress><ClientId>02-00-5E-06-0E-BC</ClientId><Name>device-165.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.149</IPAddress><ClientId>02-00-5E-06-0F-BD</ClientId><Name>device-166.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.150</IPAddress><ClientId>02-00-5E-06-10-BE</ClientId><Name>device-167.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.151</IPAddress><ClientId>02-00-5E-06-11-BF</ClientId><Name>device-168.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.152</IPAddress><ClientId>02-00-5E-06-12-C0</ClientId><Name>device-169.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.153</IPAddress><ClientId>02-00-5E-06-13-C1</ClientId><Name>device-170.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.154</IPAddress><ClientId>02-00-5E-06-14-C2</ClientId><Name>device-171.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.155</IPAddress><ClientId>02-00-5E-06-15-C3</ClientId><Name>device-172.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.156</IPAddress><ClientId>02-00-5E-06-16-C4</ClientId><Name>device-173.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.157</IPAddress><ClientId>02-00-5E-06-17-C5</ClientId><Name>device-174.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.158</IPAddress><ClientId>02-00-5E-06-18-C6</ClientId><Name>device-175.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>198.51.100.129</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>198.51.100.130,198.51.100.131</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-106.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Guest managed clients</Name><Condition>VendorClass EQ DHCPulse-Guest</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>198.51.100.192</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Cameras VLAN 107</Name>
+        <State>Active</State>
+        <LeaseDuration>7.00:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>198.51.100.197</StartRange><EndRange>198.51.100.247</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>198.51.100.202</StartRange><EndRange>198.51.100.204</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>198.51.100.212</StartRange><EndRange>198.51.100.213</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>198.51.100.198</IPAddress><ClientId>02-00-5E-07-00-CB</ClientId><Name>device-176.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.199</IPAddress><ClientId>02-00-5E-07-01-CC</ClientId><Name>device-177.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.200</IPAddress><ClientId>02-00-5E-07-02-CD</ClientId><Name>device-178.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.201</IPAddress><ClientId>02-00-5E-07-03-CE</ClientId><Name>device-179.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.202</IPAddress><ClientId>02-00-5E-07-04-CF</ClientId><Name>device-180.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.203</IPAddress><ClientId>02-00-5E-07-05-D0</ClientId><Name>device-181.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.204</IPAddress><ClientId>02-00-5E-07-06-D1</ClientId><Name>device-182.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.205</IPAddress><ClientId>02-00-5E-07-07-D2</ClientId><Name>device-183.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.206</IPAddress><ClientId>02-00-5E-07-08-D3</ClientId><Name>device-184.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.207</IPAddress><ClientId>02-00-5E-07-09-D4</ClientId><Name>device-185.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.208</IPAddress><ClientId>02-00-5E-07-0A-D5</ClientId><Name>device-186.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.209</IPAddress><ClientId>02-00-5E-07-0B-D6</ClientId><Name>device-187.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.210</IPAddress><ClientId>02-00-5E-07-0C-D7</ClientId><Name>device-188.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.211</IPAddress><ClientId>02-00-5E-07-0D-D8</ClientId><Name>device-189.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.212</IPAddress><ClientId>02-00-5E-07-0E-D9</ClientId><Name>device-190.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.213</IPAddress><ClientId>02-00-5E-07-0F-DA</ClientId><Name>device-191.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.214</IPAddress><ClientId>02-00-5E-07-10-DB</ClientId><Name>device-192.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.215</IPAddress><ClientId>02-00-5E-07-11-DC</ClientId><Name>device-193.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.216</IPAddress><ClientId>02-00-5E-07-12-DD</ClientId><Name>device-194.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.217</IPAddress><ClientId>02-00-5E-07-13-DE</ClientId><Name>device-195.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.218</IPAddress><ClientId>02-00-5E-07-14-DF</ClientId><Name>device-196.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.219</IPAddress><ClientId>02-00-5E-07-15-E0</ClientId><Name>device-197.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.220</IPAddress><ClientId>02-00-5E-07-16-E1</ClientId><Name>device-198.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.221</IPAddress><ClientId>02-00-5E-07-17-E2</ClientId><Name>device-199.lab.example</Name></Reservation>
+          <Reservation><IPAddress>198.51.100.222</IPAddress><ClientId>02-00-5E-07-18-E3</ClientId><Name>device-200.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>198.51.100.193</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>198.51.100.194,198.51.100.195</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-107.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Cameras managed clients</Name><Condition>VendorClass EQ DHCPulse-Cameras</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>203.0.113.0</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Warehouse VLAN 108</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>203.0.113.5</StartRange><EndRange>203.0.113.55</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>203.0.113.10</StartRange><EndRange>203.0.113.12</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>203.0.113.20</StartRange><EndRange>203.0.113.21</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>203.0.113.6</IPAddress><ClientId>02-00-5E-08-00-E8</ClientId><Name>device-201.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.7</IPAddress><ClientId>02-00-5E-08-01-E9</ClientId><Name>device-202.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.8</IPAddress><ClientId>02-00-5E-08-02-EA</ClientId><Name>device-203.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.9</IPAddress><ClientId>02-00-5E-08-03-EB</ClientId><Name>device-204.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.10</IPAddress><ClientId>02-00-5E-08-04-EC</ClientId><Name>device-205.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.11</IPAddress><ClientId>02-00-5E-08-05-ED</ClientId><Name>device-206.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.12</IPAddress><ClientId>02-00-5E-08-06-EE</ClientId><Name>device-207.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.13</IPAddress><ClientId>02-00-5E-08-07-EF</ClientId><Name>device-208.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.14</IPAddress><ClientId>02-00-5E-08-08-F0</ClientId><Name>device-209.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.15</IPAddress><ClientId>02-00-5E-08-09-F1</ClientId><Name>device-210.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.16</IPAddress><ClientId>02-00-5E-08-0A-F2</ClientId><Name>device-211.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.17</IPAddress><ClientId>02-00-5E-08-0B-F3</ClientId><Name>device-212.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.18</IPAddress><ClientId>02-00-5E-08-0C-F4</ClientId><Name>device-213.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.19</IPAddress><ClientId>02-00-5E-08-0D-F5</ClientId><Name>device-214.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.20</IPAddress><ClientId>02-00-5E-08-0E-F6</ClientId><Name>device-215.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.21</IPAddress><ClientId>02-00-5E-08-0F-F7</ClientId><Name>device-216.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.22</IPAddress><ClientId>02-00-5E-08-10-F8</ClientId><Name>device-217.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.23</IPAddress><ClientId>02-00-5E-08-11-F9</ClientId><Name>device-218.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.24</IPAddress><ClientId>02-00-5E-08-12-FA</ClientId><Name>device-219.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.25</IPAddress><ClientId>02-00-5E-08-13-FB</ClientId><Name>device-220.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.26</IPAddress><ClientId>02-00-5E-08-14-FC</ClientId><Name>device-221.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.27</IPAddress><ClientId>02-00-5E-08-15-FD</ClientId><Name>device-222.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.28</IPAddress><ClientId>02-00-5E-08-16-FE</ClientId><Name>device-223.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.29</IPAddress><ClientId>02-00-5E-08-17-FF</ClientId><Name>device-224.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.30</IPAddress><ClientId>02-00-5E-08-18-00</ClientId><Name>device-225.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>203.0.113.1</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>203.0.113.2,203.0.113.3</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-108.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Warehouse managed clients</Name><Condition>VendorClass EQ DHCPulse-Warehouse</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>203.0.113.64</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Training VLAN 109</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>203.0.113.69</StartRange><EndRange>203.0.113.119</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>203.0.113.74</StartRange><EndRange>203.0.113.76</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>203.0.113.84</StartRange><EndRange>203.0.113.85</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>203.0.113.70</IPAddress><ClientId>02-00-5E-09-00-05</ClientId><Name>device-226.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.71</IPAddress><ClientId>02-00-5E-09-01-06</ClientId><Name>device-227.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.72</IPAddress><ClientId>02-00-5E-09-02-07</ClientId><Name>device-228.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.73</IPAddress><ClientId>02-00-5E-09-03-08</ClientId><Name>device-229.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.74</IPAddress><ClientId>02-00-5E-09-04-09</ClientId><Name>device-230.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.75</IPAddress><ClientId>02-00-5E-09-05-0A</ClientId><Name>device-231.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.76</IPAddress><ClientId>02-00-5E-09-06-0B</ClientId><Name>device-232.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.77</IPAddress><ClientId>02-00-5E-09-07-0C</ClientId><Name>device-233.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.78</IPAddress><ClientId>02-00-5E-09-08-0D</ClientId><Name>device-234.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.79</IPAddress><ClientId>02-00-5E-09-09-0E</ClientId><Name>device-235.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.80</IPAddress><ClientId>02-00-5E-09-0A-0F</ClientId><Name>device-236.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.81</IPAddress><ClientId>02-00-5E-09-0B-10</ClientId><Name>device-237.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.82</IPAddress><ClientId>02-00-5E-09-0C-11</ClientId><Name>device-238.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.83</IPAddress><ClientId>02-00-5E-09-0D-12</ClientId><Name>device-239.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.84</IPAddress><ClientId>02-00-5E-09-0E-13</ClientId><Name>device-240.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.85</IPAddress><ClientId>02-00-5E-09-0F-14</ClientId><Name>device-241.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.86</IPAddress><ClientId>02-00-5E-09-10-15</ClientId><Name>device-242.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.87</IPAddress><ClientId>02-00-5E-09-11-16</ClientId><Name>device-243.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.88</IPAddress><ClientId>02-00-5E-09-12-17</ClientId><Name>device-244.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.89</IPAddress><ClientId>02-00-5E-09-13-18</ClientId><Name>device-245.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.90</IPAddress><ClientId>02-00-5E-09-14-19</ClientId><Name>device-246.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.91</IPAddress><ClientId>02-00-5E-09-15-1A</ClientId><Name>device-247.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.92</IPAddress><ClientId>02-00-5E-09-16-1B</ClientId><Name>device-248.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.93</IPAddress><ClientId>02-00-5E-09-17-1C</ClientId><Name>device-249.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.94</IPAddress><ClientId>02-00-5E-09-18-1D</ClientId><Name>device-250.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>203.0.113.65</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>203.0.113.66,203.0.113.67</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-109.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Training managed clients</Name><Condition>VendorClass EQ DHCPulse-Training</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>203.0.113.128</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Laboratory VLAN 110</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>203.0.113.133</StartRange><EndRange>203.0.113.183</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>203.0.113.138</StartRange><EndRange>203.0.113.140</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>203.0.113.148</StartRange><EndRange>203.0.113.149</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>203.0.113.134</IPAddress><ClientId>02-00-5E-0A-00-22</ClientId><Name>device-251.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.135</IPAddress><ClientId>02-00-5E-0A-01-23</ClientId><Name>device-252.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.136</IPAddress><ClientId>02-00-5E-0A-02-24</ClientId><Name>device-253.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.137</IPAddress><ClientId>02-00-5E-0A-03-25</ClientId><Name>device-254.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.138</IPAddress><ClientId>02-00-5E-0A-04-26</ClientId><Name>device-255.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.139</IPAddress><ClientId>02-00-5E-0A-05-27</ClientId><Name>device-256.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.140</IPAddress><ClientId>02-00-5E-0A-06-28</ClientId><Name>device-257.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.141</IPAddress><ClientId>02-00-5E-0A-07-29</ClientId><Name>device-258.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.142</IPAddress><ClientId>02-00-5E-0A-08-2A</ClientId><Name>device-259.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.143</IPAddress><ClientId>02-00-5E-0A-09-2B</ClientId><Name>device-260.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.144</IPAddress><ClientId>02-00-5E-0A-0A-2C</ClientId><Name>device-261.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.145</IPAddress><ClientId>02-00-5E-0A-0B-2D</ClientId><Name>device-262.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.146</IPAddress><ClientId>02-00-5E-0A-0C-2E</ClientId><Name>device-263.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.147</IPAddress><ClientId>02-00-5E-0A-0D-2F</ClientId><Name>device-264.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.148</IPAddress><ClientId>02-00-5E-0A-0E-30</ClientId><Name>device-265.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.149</IPAddress><ClientId>02-00-5E-0A-0F-31</ClientId><Name>device-266.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.150</IPAddress><ClientId>02-00-5E-0A-10-32</ClientId><Name>device-267.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.151</IPAddress><ClientId>02-00-5E-0A-11-33</ClientId><Name>device-268.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.152</IPAddress><ClientId>02-00-5E-0A-12-34</ClientId><Name>device-269.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.153</IPAddress><ClientId>02-00-5E-0A-13-35</ClientId><Name>device-270.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.154</IPAddress><ClientId>02-00-5E-0A-14-36</ClientId><Name>device-271.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.155</IPAddress><ClientId>02-00-5E-0A-15-37</ClientId><Name>device-272.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.156</IPAddress><ClientId>02-00-5E-0A-16-38</ClientId><Name>device-273.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.157</IPAddress><ClientId>02-00-5E-0A-17-39</ClientId><Name>device-274.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.158</IPAddress><ClientId>02-00-5E-0A-18-3A</ClientId><Name>device-275.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>203.0.113.129</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>203.0.113.130,203.0.113.131</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-110.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Laboratory managed clients</Name><Condition>VendorClass EQ DHCPulse-Laboratory</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+      <Scope>
+        <ScopeId>203.0.113.192</ScopeId>
+        <SubnetMask>255.255.255.192</SubnetMask>
+        <Name>Management VLAN 111</Name>
+        <State>Active</State>
+        <LeaseDuration>08:00:00</LeaseDuration>
+        <IPRanges><IPRange><StartRange>203.0.113.197</StartRange><EndRange>203.0.113.247</EndRange></IPRange></IPRanges>
+        <ExclusionRanges>
+          <ExclusionRange><StartRange>203.0.113.202</StartRange><EndRange>203.0.113.204</EndRange></ExclusionRange>
+          <ExclusionRange><StartRange>203.0.113.212</StartRange><EndRange>203.0.113.213</EndRange></ExclusionRange>
+        </ExclusionRanges>
+        <Reservations>
+          <Reservation><IPAddress>203.0.113.198</IPAddress><ClientId>02-00-5E-0B-00-3F</ClientId><Name>device-276.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.199</IPAddress><ClientId>02-00-5E-0B-01-40</ClientId><Name>device-277.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.200</IPAddress><ClientId>02-00-5E-0B-02-41</ClientId><Name>device-278.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.201</IPAddress><ClientId>02-00-5E-0B-03-42</ClientId><Name>device-279.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.202</IPAddress><ClientId>02-00-5E-0B-04-43</ClientId><Name>device-280.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.203</IPAddress><ClientId>02-00-5E-0B-05-44</ClientId><Name>device-281.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.204</IPAddress><ClientId>02-00-5E-0B-06-45</ClientId><Name>device-282.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.205</IPAddress><ClientId>02-00-5E-0B-07-46</ClientId><Name>device-283.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.206</IPAddress><ClientId>02-00-5E-0B-08-47</ClientId><Name>device-284.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.207</IPAddress><ClientId>02-00-5E-0B-09-48</ClientId><Name>device-285.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.208</IPAddress><ClientId>02-00-5E-0B-0A-49</ClientId><Name>device-286.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.209</IPAddress><ClientId>02-00-5E-0B-0B-4A</ClientId><Name>device-287.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.210</IPAddress><ClientId>02-00-5E-0B-0C-4B</ClientId><Name>device-288.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.211</IPAddress><ClientId>02-00-5E-0B-0D-4C</ClientId><Name>device-289.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.212</IPAddress><ClientId>02-00-5E-0B-0E-4D</ClientId><Name>device-290.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.213</IPAddress><ClientId>02-00-5E-0B-0F-4E</ClientId><Name>device-291.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.214</IPAddress><ClientId>02-00-5E-0B-10-4F</ClientId><Name>device-292.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.215</IPAddress><ClientId>02-00-5E-0B-11-50</ClientId><Name>device-293.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.216</IPAddress><ClientId>02-00-5E-0B-12-51</ClientId><Name>device-294.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.217</IPAddress><ClientId>02-00-5E-0B-13-52</ClientId><Name>device-295.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.218</IPAddress><ClientId>02-00-5E-0B-14-53</ClientId><Name>device-296.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.219</IPAddress><ClientId>02-00-5E-0B-15-54</ClientId><Name>device-297.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.220</IPAddress><ClientId>02-00-5E-0B-16-55</ClientId><Name>device-298.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.221</IPAddress><ClientId>02-00-5E-0B-17-56</ClientId><Name>device-299.lab.example</Name></Reservation>
+          <Reservation><IPAddress>203.0.113.222</IPAddress><ClientId>02-00-5E-0B-18-57</ClientId><Name>device-300.lab.example</Name></Reservation>
+        </Reservations>
+        <OptionValues>
+          <OptionValue><OptionId>3</OptionId><Name>Router</Name><Value>203.0.113.193</Value></OptionValue>
+          <OptionValue><OptionId>6</OptionId><Name>DNS Servers</Name><Value>203.0.113.194,203.0.113.195</Value></OptionValue>
+          <OptionValue><OptionId>15</OptionId><Name>DNS Domain</Name><Value>vlan-111.lab.example</Value></OptionValue>
+        </OptionValues>
+        <Policies><Policy><Name>Management managed clients</Name><Condition>VendorClass EQ DHCPulse-Management</Condition></Policy></Policies>
+        <DynamicDnsUpdate><Enabled>true</Enabled><DomainName>lab.example</DomainName></DynamicDnsUpdate>
+      </Scope>
+    </Scopes>
+    <FailoverRelationships>
+      <FailoverRelationship><Name>HQ-LOAD-BALANCE</Name><PartnerServer>dhcp02.lab.example</PartnerServer><Mode>LoadBalance</Mode></FailoverRelationship>
+      <FailoverRelationship><Name>DR-HOT-STANDBY</Name><PartnerServer>dhcp03.lab.example</PartnerServer><Mode>HotStandby</Mode></FailoverRelationship>
+    </FailoverRelationships>
+  </IPv4>
+  <IPv6>
+    <Scopes>
+      <Scope><Prefix>2001:db8:100::</Prefix><PrefixLength>64</PrefixLength><Name>Office IPv6</Name><OptionValues><OptionValue><OptionId>23</OptionId><Value>2001:db8::53</Value></OptionValue></OptionValues></Scope>
+      <Scope><Prefix>2001:db8:200::</Prefix><PrefixLength>64</PrefixLength><Name>Wireless IPv6</Name><OptionValues><OptionValue><OptionId>23</OptionId><Value>2001:db8::54</Value></OptionValue></OptionValues></Scope>
+      <Scope><Prefix>2001:db8:300::</Prefix><PrefixLength>64</PrefixLength><Name>Laboratory IPv6</Name><OptionValues><OptionValue><OptionId>24</OptionId><Value>lab.example</Value></OptionValue></OptionValues></Scope>
+    </Scopes>
+  </IPv6>
+  <SyntheticScenarioNotes>
+    <Purpose>Large local-only DHCPulse demonstration data</Purpose>
+    <ExpectedAnomalies>Duplicate address, duplicate client ID, outside reservation, gateway collision, invalid DNS option, scope overrides, failover membership warnings</ExpectedAnomalies>
+  </SyntheticScenarioNotes>
+</DhcpServerExport>

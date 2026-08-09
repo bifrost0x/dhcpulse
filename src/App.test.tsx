@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import microsoftXml from './test/fixtures/microsoft-dhcp.xml?raw';
+import largeMicrosoftXml from '../samples/microsoft-dhcp-realistic-large.xml?raw';
 
 const toolNames = [
   'Microsoft DHCP Config Workspace',
@@ -65,9 +66,42 @@ describe('DHCPulse Workbench', () => {
 
     await user.type(screen.getByRole('searchbox', { name: 'Search environment' }), 'printer');
     await user.click(screen.getByRole('button', { name: /printer\.example\.com/ }));
-    const reservationHeading = screen.getByRole('heading', { name: 'printer.example.com' });
-    expect(reservationHeading).toBeVisible();
-    expect(within(reservationHeading.closest('section')!).getAllByText('192.0.2.50').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'Documentation LAN' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Stage reservation removal' })).toBeVisible();
+  });
+
+  it('renders a large Microsoft estate as scope rows instead of an object dump', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/microsoft-workspace');
+    await user.upload(screen.getByLabelText('Microsoft DHCP XML export'), new File([largeMicrosoftXml], 'large.xml', { type: 'application/xml' }));
+
+    expect(screen.getByRole('heading', { name: 'Environment overview' })).toHaveFocus();
+    expect(screen.getAllByRole('button', { name: /Open .* VLAN 1\d\d/ })).toHaveLength(12);
+    expect(screen.getByText('331', { selector: '[data-workspace-metric="findings"]' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Reservations 300' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /device-001/ })).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search environment' }), 'device-250');
+    await user.click(screen.getByRole('button', { name: /device-250\.lab\.example.*Training VLAN 109/ }));
+    expect(screen.getByRole('heading', { name: 'Training VLAN 109' })).toBeVisible();
+  });
+
+  it('loads only the active scope tab and groups repeated findings', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/microsoft-workspace');
+    await user.upload(screen.getByLabelText('Microsoft DHCP XML export'), new File([largeMicrosoftXml], 'large.xml', { type: 'application/xml' }));
+    await user.click(screen.getByRole('button', { name: 'Open Office VLAN 100' }));
+
+    expect(screen.getByRole('heading', { name: 'Office VLAN 100' })).toHaveFocus();
+    expect(screen.queryByText('device-001.lab.example')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /Reservations/ }));
+    expect(screen.getAllByRole('row').length).toBeLessThanOrEqual(51);
+    await user.click(screen.getByRole('tab', { name: /Findings/ }));
+    expect(screen.getByText('Reservation is inside a dynamic pool')).toBeVisible();
+    expect(screen.getByText('24')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: '← All scopes' }));
+    expect(screen.getByRole('heading', { name: 'Environment overview' })).toHaveFocus();
   });
 
   it('rejects oversized workspace files before reading and cancels pending reads on Reset', async () => {
@@ -130,12 +164,14 @@ describe('DHCPulse Workbench', () => {
     renderAt('#/tool/microsoft-workspace');
     await user.click(screen.getByRole('button', { name: 'Open synthetic example' }));
 
+    await user.click(screen.getByRole('button', { name: /Documentation LAN/ }));
     await user.click(screen.getByRole('button', { name: '192.0.2.30 – 192.0.2.39' }));
     expect(screen.getByRole('button', { name: 'Stage exclusion removal' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Stage exclusion removal' }));
     expect(screen.getByText('exclusion.remove')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: /printer\.example\.com/ }));
+    await user.click(screen.getByRole('tab', { name: /Reservations/ }));
+    await user.click(screen.getByRole('button', { name: 'Select' }));
     expect(screen.getByRole('button', { name: 'Stage reservation removal' })).toBeVisible();
   });
 
