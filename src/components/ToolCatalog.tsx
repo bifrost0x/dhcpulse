@@ -9,6 +9,7 @@ type Category = 'all' | ToolGroup;
 const categories: Category[] = ['all', 'plan', 'build', 'analyze', 'troubleshoot', 'secure'];
 
 const keywords: Record<ToolId, { en: string[]; de: string[] }> = {
+  'microsoft-workspace': { en: ['microsoft', 'windows', 'xml', 'powershell', 'change package'], de: ['microsoft', 'windows', 'xml', 'powershell', 'change-paket'] },
   scope: { en: ['subnet', 'cidr', 'pool', 'capacity'], de: ['subnetz', 'cidr', 'pool', 'kapazität'] },
   lease: { en: ['cutover', 'migration', 'renewal', 'timing'], de: ['cutover', 'migration', 'renewal', 'zeit'] },
   options: { en: ['option', 'dns', 'gateway', 'encode'], de: ['option', 'dns', 'gateway', 'kodieren'] },
@@ -121,7 +122,7 @@ export function ToolCatalog({ locale, onToolSelect }: ToolCatalogProps) {
             <h2 id={headingId}>{categoryLabel(group)}</h2>
             <div className="tool-grid">
               {tools.map((tool) => (
-                <a key={tool.id} className="tool-card" href={`#/tool/${tool.id}`} onClick={(event) => handleToolClick(event, tool.id)}>
+                <a key={tool.id} className={`tool-card${tool.id === 'microsoft-workspace' ? ' tool-card-featured' : ''}`} href={`#/tool/${tool.id}`} onClick={(event) => handleToolClick(event, tool.id)}>
                   <span className="tool-card-group">{categoryLabel(tool.group)}</span>
                   <strong>{tool.name[locale]}</strong>
                   <p>{tool.description[locale]}</p>

@@ -6,7 +6,9 @@ DHCPulse is designed as a static, local-only application. It has no application 
 
 Interactive values are held in JavaScript memory in the current browser tab. The configuration analyzer and comparison tools access a user-selected file through the browser File API and read its text in browser memory. After a successful import, the raw text is removed from application state; the normalized configuration remains in volatile memory while the tool is open so the analysis or comparison can be displayed.
 
-Reports are redacted by default when they originate from imported configurations. Redaction is a sharing safeguard, not a guarantee that every possible vendor-specific secret or identifier will be recognized. Review every report before sharing it.
+Analyzer and comparison reports are redacted by default when they originate from imported configurations. Redaction is a sharing safeguard, not a guarantee that every possible vendor-specific secret or identifier will be recognized. Review every report before sharing it.
+
+Microsoft workspace change packages are operational artifacts, not shareable redacted reports. They intentionally preserve the server, scope, address, reservation, and option values required for review and execution. Treat every generated package like its source configuration and keep it under appropriate access control.
 
 Downloads are created from an in-memory `Blob`. DHCPulse creates a temporary object URL, activates the browser download, and revokes the object URL immediately afterward. The browser and operating system control the resulting downloaded file.
 
