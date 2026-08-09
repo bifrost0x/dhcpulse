@@ -241,6 +241,7 @@ describe('analyzeMultiPoolScope', () => {
 describe('toolCatalog', () => {
   it('contains every required stable ID exactly once', () => {
     expect(toolCatalog.map((tool) => tool.id)).toEqual([
+      'microsoft-workspace',
       'scope',
       'lease',
       'options',
@@ -252,6 +253,6 @@ describe('toolCatalog', () => {
       'config-analyzer',
       'config-diff',
     ]);
-    expect(new Set(toolCatalog.map((tool) => tool.id)).size).toBe(10);
+    expect(new Set(toolCatalog.map((tool) => tool.id)).size).toBe(11);
   });
 });

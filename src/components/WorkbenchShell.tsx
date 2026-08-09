@@ -7,6 +7,7 @@ import { Dhcpv6Tool } from '../tools/Dhcpv6Tool';
 import { DiagnosticsTool } from '../tools/DiagnosticsTool';
 import { FailoverTool } from '../tools/FailoverTool';
 import { LeaseTool } from '../tools/LeaseTool';
+import { MicrosoftWorkspaceTool } from '../tools/MicrosoftWorkspaceTool';
 import { OptionsTool } from '../tools/OptionsTool';
 import { PxeTool } from '../tools/PxeTool';
 import { ScopeTool } from '../tools/ScopeTool';
@@ -20,6 +21,7 @@ type ToolId = ToolCatalogEntry['id'];
 type Route = { kind: 'catalog' } | { kind: 'tool'; id: ToolId } | { kind: 'not-found' };
 
 const toolComponents: Record<Exclude<ToolId, 'lease'>, ComponentType<ToolPanelProps>> = {
+  'microsoft-workspace': MicrosoftWorkspaceTool,
   scope: ScopeTool,
   options: OptionsTool,
   pxe: PxeTool,

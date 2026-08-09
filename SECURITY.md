@@ -34,7 +34,7 @@ Each pasted input and selected file is limited to 2 MiB of UTF-8 data. Kea objec
 
 Imported configuration may contain infrastructure identifiers and secrets in fields the bounded adapters do not understand. Analyzer and comparison reports are redacted by default, and report generation replaces entered string values where configured, but redaction is not a data-loss-prevention system. It cannot guarantee recognition of every vendor extension, encoded secret, free-form comment, option value, or sensitive relationship.
 
-Use synthetic samples for reports and bug submissions whenever possible. Inspect downloaded content before sharing, and protect browser history, screenshots, clipboard contents, temporary files, and downloads according to the source data's classification.
+Use synthetic samples for reports and bug submissions whenever possible. Inspect downloaded content before sharing, and protect browser history, screenshots, clipboard contents, temporary files, and downloads according to the source data's classification. Microsoft workspace change packages intentionally contain the operational values needed by their guarded PowerShell scripts and are not redacted sharing artifacts.
 
 ## Limitations
 

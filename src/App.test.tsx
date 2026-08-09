@@ -2,8 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import microsoftXml from './test/fixtures/microsoft-dhcp.xml?raw';
 
 const toolNames = [
+  'Microsoft DHCP Config Workspace',
   'Scope and capacity',
   'Lease transition',
   'DHCP options',
@@ -37,13 +39,104 @@ describe('DHCPulse Workbench', () => {
     renderAt();
 
     expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toBeVisible();
-    expect(screen.getByText('10 tools ready')).toBeVisible();
+    expect(screen.getByText('11 tools ready')).toBeVisible();
     for (const group of ['Plan', 'Build', 'Analyze', 'Troubleshoot', 'Secure']) {
       expect(screen.getByRole('heading', { name: group })).toBeVisible();
     }
     for (const name of toolNames) {
       expect(screen.getByRole('link', { name: new RegExp(name) })).toHaveAttribute('href', expect.stringContaining('#/tool/'));
     }
+  });
+
+  it('opens a Microsoft export as a navigable object workspace', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/microsoft-workspace');
+
+    expect(screen.getByRole('heading', { name: 'Microsoft DHCP Config Workspace' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Open a Microsoft DHCP export' })).toBeVisible();
+    const file = new File([microsoftXml], 'corp-dhcp.xml', { type: 'application/xml' });
+    await user.upload(screen.getByLabelText('Microsoft DHCP XML export'), file);
+
+    expect(screen.getByRole('heading', { name: 'Environment overview' })).toHaveFocus();
+    expect(screen.getAllByText('dhcp01.example.com').length).toBeGreaterThan(0);
+    expect(screen.getByText('1', { selector: '[data-workspace-metric="ipv4-scopes"]' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Documentation LAN/ })).toBeVisible();
+    expect(screen.getByText(/reservation is inside a dynamic pool/i)).toBeVisible();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search environment' }), 'printer');
+    await user.click(screen.getByRole('button', { name: /printer\.example\.com/ }));
+    const reservationHeading = screen.getByRole('heading', { name: 'printer.example.com' });
+    expect(reservationHeading).toBeVisible();
+    expect(within(reservationHeading.closest('section')!).getAllByText('192.0.2.50').length).toBeGreaterThan(0);
+  });
+
+  it('rejects oversized workspace files before reading and cancels pending reads on Reset', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/microsoft-workspace');
+    const input = screen.getByLabelText('Microsoft DHCP XML export');
+    const oversized = new File(['small'], 'oversized.xml');
+    const oversizedText = vi.fn(async () => microsoftXml);
+    Object.defineProperties(oversized, { size: { configurable: true, value: 2 * 1024 * 1024 + 1 }, text: { configurable: true, value: oversizedText } });
+
+    await user.upload(input, oversized);
+    expect(oversizedText).not.toHaveBeenCalled();
+    expect(input).toHaveAccessibleDescription('Files must be 2 MiB or smaller.');
+
+    const pending = deferred<string>();
+    const delayed = new File(['ignored'], 'pending.xml');
+    Object.defineProperty(delayed, 'text', { configurable: true, value: vi.fn(() => pending.promise) });
+    fireEvent.change(input, { target: { files: [delayed] } });
+    await user.click(screen.getByRole('button', { name: 'Reset workspace' }));
+    await act(async () => pending.resolve(microsoftXml));
+
+    expect(screen.queryByRole('heading', { name: 'Environment overview' })).not.toBeInTheDocument();
+    expect(screen.queryByText('pending.xml')).not.toBeInTheDocument();
+  });
+
+  it('localizes the Microsoft workspace and its imported review', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/microsoft-workspace');
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByRole('heading', { name: 'Microsoft-DHCP-Konfigurationsarbeitsbereich' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Synthetisches Beispiel öffnen' }));
+    expect(screen.getByRole('heading', { name: 'Umgebungsübersicht' })).toHaveFocus();
+    expect(screen.getByText(/Reservierung liegt in einem dynamischen Pool/)).toBeVisible();
+  });
+
+  it('turns a selected scope change into a guarded PowerShell package', async () => {
+    const user = userEvent.setup();
+    const downloads = captureDownloads();
+    renderAt('#/tool/microsoft-workspace');
+    await user.click(screen.getByRole('button', { name: 'Open synthetic example' }));
+    await user.click(screen.getByRole('button', { name: /Documentation LAN/ }));
+
+    await user.clear(screen.getByRole('spinbutton', { name: 'Lease duration in hours' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Lease duration in hours' }), '24');
+    await user.click(screen.getByRole('button', { name: 'Stage lease change' }));
+
+    expect(screen.getByRole('heading', { name: 'Change Set' })).toBeVisible();
+    expect(screen.getByText(/8 hours.*24 hours/i)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Generate guarded package' }));
+    expect(await screen.findByRole('heading', { name: 'Generated package' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Download 02-Apply.ps1' }));
+    expect(downloads.items.at(-1)?.filename).toBe('02-Apply.ps1');
+    expect(await downloads.items.at(-1)?.blob.text()).toContain('Set-DhcpServerv4Scope');
+    expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it('offers object-specific changes instead of a generic questionnaire', async () => {
+    const user = userEvent.setup();
+    renderAt('#/tool/microsoft-workspace');
+    await user.click(screen.getByRole('button', { name: 'Open synthetic example' }));
+
+    await user.click(screen.getByRole('button', { name: '192.0.2.30 – 192.0.2.39' }));
+    expect(screen.getByRole('button', { name: 'Stage exclusion removal' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Stage exclusion removal' }));
+    expect(screen.getByText('exclusion.remove')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: /printer\.example\.com/ }));
+    expect(screen.getByRole('button', { name: 'Stage reservation removal' })).toBeVisible();
   });
 
   it('keeps narrow-page overflow out of the document while category scrolling stays local', async () => {
@@ -76,7 +169,7 @@ describe('DHCPulse Workbench', () => {
     await user.type(germanSearch, 'kein solches werkzeug');
     expect(screen.getByText('Keine passenden Tools gefunden.')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Suche löschen' }));
-    expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('#/tool/'))).toHaveLength(10);
+    expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('#/tool/'))).toHaveLength(11);
   });
 
   it('navigates through valid tool hashes without reloading', async () => {
@@ -286,10 +379,11 @@ describe('DHCPulse Workbench', () => {
   });
 
   it('renders a named, non-empty panel for every stable route', () => {
-    const view = renderAt('#/tool/scope');
+    const ids = ['microsoft-workspace', 'scope', 'lease', 'options', 'pxe', 'failover', 'dhcpv6', 'diagnostics', 'security', 'config-analyzer', 'config-diff'];
+    const view = renderAt('#/tool/microsoft-workspace');
 
     toolNames.forEach((name, index) => {
-      const id = ['scope', 'lease', 'options', 'pxe', 'failover', 'dhcpv6', 'diagnostics', 'security', 'config-analyzer', 'config-diff'][index];
+      const id = ids[index];
       if (index > 0) {
         window.location.hash = `#/tool/${id}`;
         fireEvent(window, new HashChangeEvent('hashchange'));

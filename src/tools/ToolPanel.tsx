@@ -7,6 +7,10 @@ export interface ToolPanelProps {
 }
 
 const guidance: Record<ToolCatalogEntry['id'], { en: string; de: string }> = {
+  'microsoft-workspace': {
+    en: 'Open a Microsoft DHCP export, inspect the actual environment, and stage reviewable changes.',
+    de: 'Öffne einen Microsoft-DHCP-Export, prüfe die reale Umgebung und plane nachvollziehbare Änderungen.',
+  },
   scope: {
     en: 'Shape address pools, exclusions, reservations, and capacity before rollout.',
     de: 'Plane Adresspools, Ausschlüsse, Reservierungen und Kapazität vor der Einführung.',

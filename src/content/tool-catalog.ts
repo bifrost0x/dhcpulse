@@ -3,6 +3,7 @@ export type ToolAvailability = 'ready' | 'planned';
 
 export interface ToolCatalogEntry {
   id:
+    | 'microsoft-workspace'
     | 'scope'
     | 'lease'
     | 'options'
@@ -20,6 +21,13 @@ export interface ToolCatalogEntry {
 }
 
 export const toolCatalog: ToolCatalogEntry[] = [
+  {
+    id: 'microsoft-workspace',
+    group: 'analyze',
+    availability: 'ready',
+    name: { en: 'Microsoft DHCP Config Workspace', de: 'Microsoft-DHCP-Konfigurationsarbeitsbereich' },
+    description: { en: 'Open a real Microsoft DHCP export, review linked objects, and build a guarded change package.', de: 'Einen echten Microsoft-DHCP-Export öffnen, verknüpfte Objekte prüfen und ein abgesichertes Change-Paket erstellen.' },
+  },
   {
     id: 'scope',
     group: 'plan',
