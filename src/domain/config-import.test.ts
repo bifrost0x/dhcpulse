@@ -321,6 +321,7 @@ describe('importDhcpConfiguration', () => {
   it.each([
     ['kea-json', `{"Dhcp4":{"nested":${'['.repeat(70)}0${']'.repeat(70)}}}`],
     ['isc-dhcpd', `${'group documentation {'.repeat(70)}${'}'.repeat(70)}`],
+    ['microsoft-xml', `<DhcpServerExport>${'<Node>'.repeat(65)}${'</Node>'.repeat(65)}</DhcpServerExport>`],
   ] as const)('rejects excessively deep %s structures with a stable code', (format, text) => {
     expectImportErrorWithFormat(text, format, 'STRUCTURE_TOO_COMPLEX');
   });
@@ -328,6 +329,7 @@ describe('importDhcpConfiguration', () => {
   it.each([
     ['kea-json', `{"Dhcp4":{"values":[${Array.from({ length: 20_100 }, () => '0').join(',')}]}}`],
     ['isc-dhcpd', 'unknown-directive;\n'.repeat(20_100)],
+    ['microsoft-xml', `<DhcpServerExport>${'<Node/>'.repeat(20_001)}</DhcpServerExport>`],
   ] as const)('rejects excessively complex %s structures with a stable code', (format, text) => {
     expectImportErrorWithFormat(text, format, 'STRUCTURE_TOO_COMPLEX');
   });
@@ -345,7 +347,7 @@ function expectImportError(text: string, fileName: string, code: ConfigImportErr
 
 function expectImportErrorWithFormat(
   text: string,
-  format: 'kea-json' | 'isc-dhcpd',
+  format: 'microsoft-xml' | 'kea-json' | 'isc-dhcpd',
   code: ConfigImportError['code'],
 ): void {
   try {

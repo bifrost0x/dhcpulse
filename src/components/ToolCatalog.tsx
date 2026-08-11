@@ -25,15 +25,17 @@ const keywords: Record<ToolId, { en: string[]; de: string[] }> = {
 interface ToolCatalogProps {
   locale: Locale;
   onToolSelect: (id: ToolId) => void;
+  exclude?: ToolId[];
 }
 
-export function ToolCatalog({ locale, onToolSelect }: ToolCatalogProps) {
+export function ToolCatalog({ locale, onToolSelect, exclude = [] }: ToolCatalogProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('all');
   const categoryRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
   const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const visibleTools = useMemo(() => toolCatalog.filter((tool) => {
+    if (exclude.includes(tool.id)) return false;
     if (category !== 'all' && tool.group !== category) return false;
     if (!normalizedQuery) return true;
     const groupKey = `catalog.group.${tool.group}` as const;
@@ -49,7 +51,7 @@ export function ToolCatalog({ locale, onToolSelect }: ToolCatalogProps) {
       ...keywords[tool.id].de,
     ].join(' ').toLocaleLowerCase(locale);
     return searchable.includes(normalizedQuery);
-  }), [category, locale, normalizedQuery]);
+  }), [category, exclude, locale, normalizedQuery]);
 
   function categoryLabel(value: Category) {
     return value === 'all' ? t('catalog.all') : t(`catalog.group.${value}`);

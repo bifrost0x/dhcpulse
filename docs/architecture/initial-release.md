@@ -2,15 +2,17 @@
 
 ## Release shape
 
-DHCPulse is a static React and TypeScript single-page application built with Vite. A hash-based workbench shell presents ten implemented tools without a router dependency or backend. English and German interface copy is bundled with the application.
+DHCPulse is a static React and TypeScript single-page application built with Vite. A hash-based shell presents one multi-vendor configuration workspace plus subordinate specialist utilities without a router dependency or backend. English and German interface copy is bundled with the application.
 
 The release covers scope and capacity planning, lease transitions, DHCP options, PXE, Windows DHCP failover, DHCPv6, diagnostics, DHCP security, configuration analysis, and semantic configuration comparison. It does not provide DHCP service, IPAM/DDI, live monitoring, active discovery, packet generation, or vendor validation.
 
-## Modular tool shell
+## Workspace-first shell
 
-`src/components/WorkbenchShell.tsx` owns hash routing, catalog and tool selection, focus movement, locale propagation, and per-tool reset keys. `src/content/tool-catalog.ts` is the authoritative registry for the ten tool IDs, groups, localized names, and descriptions. Each module under `src/tools/` adapts form state to a domain engine and renders results, assumptions, source links, and local report actions.
+`src/components/WorkbenchShell.tsx` owns hash routing, the volatile imported session, focus movement, locale propagation, and per-utility reset keys. `#/` is the safe local import entry, `#/workspace` is the active session, and `#/utilities` contains focused calculators and generators. The retired Microsoft utility route resolves to the unified entry rather than maintaining a second state machine.
 
-The shell does not share scenario or import state between tools. Reset remounts the active tool; returning to the catalog unmounts it. This keeps the state lifetime bounded to the current tab and active tool.
+`src/domain/config-workspace.ts` wraps the normalized configuration, searchable nodes, summaries, findings, scope assessment, and capability boundary in one vendor-neutral contract. `src/domain/remediation-queue.ts` converts grouped findings into bounded Act now, Review, and Observe work, preserves occurrence and scope context, tracks prepared operations, and summarizes package risk for exact targets. Microsoft executable actions are defined only in the closed registry in `src/domain/finding-actions.ts`; non-Microsoft workspaces never expose executable actions.
+
+The shell does not persist workspace or utility state. Opening another configuration discards the imported session; returning to Utilities unmounts a utility. This keeps state lifetime bounded to the current tab.
 
 ## Domain engines
 
@@ -24,7 +26,13 @@ Most domain engines are pure and independent of React and the DOM. Browser-speci
 
 Four adapters normalize Microsoft DHCP XML, Kea JSON, ISC dhcpd, and dnsmasq input into that model. Detection is content- and file-name-based. Inputs are capped at 2 MiB; XML entity declarations are rejected; structured Kea and ISC inputs have additional complexity bounds. Every adapter is a bounded analysis subset. Unsupported syntax is omitted and surfaced through parser warnings where detected.
 
-The analyzer summarizes canonical entities and selected observations. The comparison engine matches normalized entities by semantic identity, classifies additions, removals, and changes, assigns migration impact, and redacts values before returning displayable change records.
+The workspace summarizes canonical entities and opens on a bounded overview that explains the product boundary and the progressive review flow. Its remediation queue then provides the primary operational surface. A persistent context panel carries rationale, impact, recommendation, evidence, provenance, relationships, occurrence navigation, and validated change preview without forcing the operator through disconnected forms. Expert findings and bounded object search remain available without rendering the full normalized model. The comparison engine matches normalized entities by semantic identity, classifies additions, removals, and changes, assigns migration impact, and redacts values before returning displayable change records.
+
+## Finding-to-change boundary
+
+Workspace findings carry deterministic IDs, typed evidence, confidence, affected object IDs, operational impact and recommendation keys, authoritative sources, and an optional allow-listed action ID. The registry currently builds only single-address exclusions for supported Microsoft reservation and gateway findings. Every operation passes through the existing change-set validator before package eligibility is evaluated.
+
+Package generation independently requires a Microsoft XML source, a named server, a valid non-empty change set, complete target facts, and no blocker finding on the target scopes. Output contains Preflight, Apply, Verify, Rollback, a change runbook, the immutable change set, and a SHA-256 manifest. No output is executed by the application.
 
 ## Report and redaction path
 
@@ -35,13 +43,13 @@ Downloads use an in-memory `Blob`. A temporary object URL is created for the bro
 ## Trust boundaries
 
 ```text
-Untrusted pasted text or local file
+Untrusted local configuration file
   -> browser File API and size check
   -> format detection and bounded adapter
   -> canonical configuration in tab memory
-  -> analyzer or redacted semantic comparison
-  -> redacted report builder
-  -> local Blob download
+  -> vendor-neutral workspace and explainable findings
+  -> allow-listed Microsoft action, typed validation, package eligibility
+  -> local package Blob download
 ```
 
 The source text and canonical configuration remain inside the current browser tab. No application endpoint, persistence layer, service worker, analytics service, or telemetry client exists. Production HTML sets `connect-src 'none'`, and the build verifier rejects compiled network primitives. External documentation requests occur only after a user follows a link. Static hosts remain outside the application trust boundary and can observe ordinary asset requests.

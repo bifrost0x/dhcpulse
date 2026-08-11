@@ -23,7 +23,7 @@ export function ToolFrame({ children, locale, tool, headingRef, onBack, onReset 
 
   return (
     <article className="tool-frame" aria-labelledby={titleId}>
-      <a className="back-link" href="#/" onClick={handleBack}><ArrowLeft size={18} aria-hidden="true" />{t('frame.back')}</a>
+      <a className="back-link" href="#/utilities" onClick={handleBack}><ArrowLeft size={18} aria-hidden="true" />{t('frame.back')}</a>
       <header className="tool-frame-header">
         <div>
           <p className="section-kicker">{t(`catalog.group.${tool.group}`)}</p>

@@ -1,22 +1,21 @@
-import type { Ref } from 'react';
 import type { Locale } from '../../content/copy';
 import type { MicrosoftWorkspace, WorkspaceNode } from '../../domain/microsoft-workspace';
+import type { RefObject } from 'react';
 
 interface WorkspaceObjectViewProps {
   locale: Locale;
   workspace: MicrosoftWorkspace;
-  selected: WorkspaceNode | null;
-  overviewHeadingRef?: Ref<HTMLHeadingElement>;
+  selected: WorkspaceNode;
+  headingRef?: RefObject<HTMLHeadingElement | null>;
 }
 
-export function WorkspaceObjectView({ locale, workspace, selected, overviewHeadingRef }: WorkspaceObjectViewProps) {
-  if (!selected) return <WorkspaceOverview locale={locale} workspace={workspace} headingRef={overviewHeadingRef} />;
+export function WorkspaceObjectView({ locale, workspace, selected, headingRef }: WorkspaceObjectViewProps) {
   const scope = workspace.configuration.ipv4Scopes.find(({ id }) => id === selected.id);
   const scopeSummary = scope ? workspace.scopeSummaries[scope.id] : undefined;
   return (
     <section className="workspace-object planner-card" aria-labelledby="workspace-object-heading">
       <p className="section-kicker">{kindLabel(selected.kind, locale)}</p>
-      <h2 id="workspace-object-heading">{selected.label}</h2>
+      <h2 id="workspace-object-heading" ref={headingRef} tabIndex={-1}>{selected.label}</h2>
       {selected.secondary && <p className="workspace-object-secondary">{selected.secondary}</p>}
       {scope && scopeSummary && <>
         <div className="workspace-capacity-header"><span>{scope.startRange} – {scope.endRange}</span><strong>{Math.round(scopeSummary.utilizationPercent)} %</strong></div>
@@ -29,35 +28,10 @@ export function WorkspaceObjectView({ locale, workspace, selected, overviewHeadi
           <Fact label={locale === 'de' ? 'Lease-Dauer' : 'Lease duration'} value={scope.leaseLifetimeSeconds ? `${scope.leaseLifetimeSeconds / 3600} h` : '—'} />
           <Fact label={locale === 'de' ? 'Wirksame Optionen' : 'Effective options'} value={scopeSummary.effectiveOptions.length} />
         </dl>
-        <section className="workspace-related"><h3>{locale === 'de' ? 'Wirksame Optionen' : 'Effective options'}</h3><ul>{scopeSummary.effectiveOptions.map((option) => <li key={option.optionId}><span>Option {option.code ?? option.name}</span><code>{displayValue(option.value)}</code><small>{option.sourceLevel}</small></li>)}</ul></section>
+        <section className="workspace-related"><h3>{locale === 'de' ? 'Wirksame Optionen' : 'Effective options'}</h3><ul>{scopeSummary.effectiveOptions.slice(0, 50).map((option) => <li key={option.optionId}><span>Option {option.code ?? option.name}</span><code>{displayValue(option.value)}</code><small>{levelLabel(option.sourceLevel, locale)}</small></li>)}</ul>{scopeSummary.effectiveOptions.length > 50 && <p>{locale === 'de' ? `Die ersten 50 von ${scopeSummary.effectiveOptions.length} Optionen werden angezeigt. Suche die Option für vollständige Details direkt.` : `Showing the first 50 of ${scopeSummary.effectiveOptions.length} options. Search for an option directly to inspect its full detail.`}</p>}</section>
       </>}
       {!scope && <ObjectFacts workspace={workspace} node={selected} locale={locale} />}
       <footer className="workspace-provenance"><span>{locale === 'de' ? 'Quelle' : 'Source'}</span><code>{selected.provenance.location}</code></footer>
-    </section>
-  );
-}
-
-function WorkspaceOverview({ locale, workspace, headingRef }: { locale: Locale; workspace: MicrosoftWorkspace; headingRef?: Ref<HTMLHeadingElement> }) {
-  const c = locale === 'de'
-    ? { title: 'Umgebungsübersicht', server: 'Server', scopes: 'IPv4-Scopes', pools: 'Pools', reservations: 'Reservierungen', options: 'Optionen', findings: 'Befunde', readiness: 'Change-Generierung' }
-    : { title: 'Environment overview', server: 'Server', scopes: 'IPv4 scopes', pools: 'Pools', reservations: 'Reservations', options: 'Options', findings: 'Findings', readiness: 'Change generation' };
-  return (
-    <section className="workspace-object planner-card" aria-labelledby="workspace-overview-heading">
-      <p className="section-kicker">Microsoft DHCP</p>
-      <h2 id="workspace-overview-heading" ref={headingRef} tabIndex={-1}>{c.title}</h2>
-      <p className="workspace-server-name">{workspace.serverName ?? '—'}</p>
-      <div className="workspace-metrics">
-        <Metric label={c.scopes} value={workspace.summaries.ipv4Scopes} name="ipv4-scopes" />
-        <Metric label={c.pools} value={workspace.summaries.pools} />
-        <Metric label={c.reservations} value={workspace.summaries.reservations} />
-        <Metric label={c.options} value={workspace.summaries.options} />
-        <Metric label={c.findings} value={workspace.findings.length} />
-      </div>
-      <section className={`workspace-readiness ${workspace.generation.enabled ? 'ready' : 'blocked'}`}>
-        <h3>{c.readiness}</h3>
-        <strong>{workspace.generation.enabled ? (locale === 'de' ? 'Bereit' : 'Ready') : (locale === 'de' ? 'Blockiert' : 'Blocked')}</strong>
-        {!workspace.generation.enabled && <ul>{workspace.generation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
-      </section>
     </section>
   );
 }
@@ -70,12 +44,12 @@ function ObjectFacts({ workspace, node, locale }: { workspace: MicrosoftWorkspac
   const values: Array<[string, string | number]> = [];
   if (reservation) values.push([locale === 'de' ? 'Adresse' : 'Address', reservation.address], [locale === 'de' ? 'Client-ID' : 'Client ID', maskIdentifier(reservation.identifier)]);
   if (pool || exclusion) values.push([locale === 'de' ? 'Start' : 'Start', (pool ?? exclusion)!.start], [locale === 'de' ? 'Ende' : 'End', (pool ?? exclusion)!.end]);
-  if (option) values.push(['Option', option.code ?? option.name ?? '—'], [locale === 'de' ? 'Wert' : 'Value', displayValue(option.value)], [locale === 'de' ? 'Ebene' : 'Level', option.level]);
+  if (option) values.push(['Option', option.code ?? option.name ?? '—'], [locale === 'de' ? 'Wert' : 'Value', displayValue(option.value)], [locale === 'de' ? 'Ebene' : 'Level', levelLabel(option.level, locale)]);
   return <dl className="workspace-facts">{values.map(([label, value]) => <Fact key={label} label={label} value={value} />)}</dl>;
 }
 
 function Fact({ label, value }: { label: string; value: string | number }) { return <div><dt>{label}</dt><dd>{value}</dd></div>; }
-function Metric({ label, value, name }: { label: string; value: number; name?: string }) { return <div><span>{label}</span><strong data-workspace-metric={name}>{value}</strong></div>; }
 function displayValue(value: string | number | boolean | string[]) { return Array.isArray(value) ? value.join(', ') : String(value); }
 function maskIdentifier(value: string | undefined) { if (!value) return '—'; return value.length <= 5 ? '••••' : `${value.slice(0, 5)}••••`; }
-function kindLabel(kind: WorkspaceNode['kind'], locale: Locale) { const labels = locale === 'de' ? { server: 'Server', scope: 'IPv4-Scope', pool: 'Pool', exclusion: 'Ausschluss', reservation: 'Reservierung', option: 'Option', policy: 'Policy', failover: 'Failover', dhcpv6: 'DHCPv6' } : { server: 'Server', scope: 'IPv4 scope', pool: 'Pool', exclusion: 'Exclusion', reservation: 'Reservation', option: 'Option', policy: 'Policy', failover: 'Failover', dhcpv6: 'DHCPv6' }; return labels[kind]; }
+function kindLabel(kind: WorkspaceNode['kind'], locale: Locale) { const labels = locale === 'de' ? { server: 'Server', scope: 'IPv4-Scope', pool: 'Pool', exclusion: 'Ausschluss', reservation: 'Reservierung', option: 'Option', policy: 'Richtlinie', failover: 'Failover', dhcpv6: 'DHCPv6' } : { server: 'Server', scope: 'IPv4 scope', pool: 'Pool', exclusion: 'Exclusion', reservation: 'Reservation', option: 'Option', policy: 'Policy', failover: 'Failover', dhcpv6: 'DHCPv6' }; return labels[kind]; }
+function levelLabel(level: string, locale: Locale) { if (locale === 'en') return level; return level === 'global' ? 'Serverweit' : level === 'scope' ? 'Scope' : level; }

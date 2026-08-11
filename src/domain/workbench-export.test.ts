@@ -15,7 +15,10 @@ const reportInput = {
 };
 
 describe('buildWorkbenchReport', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('builds deterministic Markdown and JSON with redaction and a privacy note', () => {
     const first = buildWorkbenchReport(reportInput);
@@ -70,7 +73,8 @@ describe('buildWorkbenchReport', () => {
     expect(JSON.parse(report.json).privacy).toContain('keine Daten hochgeladen');
   });
 
-  it('creates, clicks, and immediately revokes one object URL', () => {
+  it('creates and clicks one object URL before deferring revocation', () => {
+    vi.useFakeTimers();
     const createObjectURL = vi.fn(() => 'blob:workbench-report');
     const revokeObjectURL = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
@@ -81,6 +85,8 @@ describe('buildWorkbenchReport', () => {
 
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.runOnlyPendingTimers();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:workbench-report');
   });
 });

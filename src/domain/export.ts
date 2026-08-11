@@ -1,4 +1,5 @@
 import { translate, type CopyKey, type Locale } from '../content/copy';
+import { downloadTextFile } from './download';
 import type { PlanResult, ScenarioInput } from './types';
 
 export function createMarkdownPlan(
@@ -99,14 +100,5 @@ export function downloadJson(content: string, filename = 'dhcpulse-change-plan.j
 }
 
 function downloadFile(content: string, filename: string, type: string): void {
-  const blob = new Blob([content], { type: `${type};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  try {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  downloadTextFile(content, filename, `${type};charset=utf-8`);
 }

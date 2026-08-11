@@ -1,3 +1,4 @@
+import { downloadTextFile } from './download';
 import { createRedactor } from './redaction';
 
 export type WorkbenchFindingSeverity = 'blocker' | 'warning' | 'info';
@@ -123,15 +124,7 @@ export function buildWorkbenchReport(input: WorkbenchReportInput): WorkbenchRepo
 }
 
 export function downloadWorkbenchReport(content: string, filename: string, type = 'text/markdown'): void {
-  const url = URL.createObjectURL(new Blob([content], { type: `${type};charset=utf-8` }));
-  try {
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  downloadTextFile(content, filename, `${type};charset=utf-8`);
 }
 
 function scrubInputSummary(value: unknown): unknown {
