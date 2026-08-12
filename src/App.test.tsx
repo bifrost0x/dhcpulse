@@ -190,8 +190,11 @@ describe('DHCPulse Workbench', () => {
 
     expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('region', { name: 'Review tray' })).not.toBeInTheDocument();
-    expect(within(context).getByText('Validated change preview')).toBeVisible();
+    const preview = within(context).getByText('Validated change preview').closest('section')!;
+    expect(preview).toBeVisible();
     expect(within(context).getByText('Warehouse VLAN 108 · 203.0.113.0/26')).toBeVisible();
+    expect(within(preview).getByText('203.0.113.13')).toBeVisible();
+    expect(within(preview).queryByText('{"start":"203.0.113.13","end":"203.0.113.13"}')).not.toBeInTheDocument();
     await user.click(within(context).getByRole('button', { name: 'Add to review' }));
     expect(screen.getByRole('region', { name: 'Review tray' })).toHaveTextContent('1 prepared change');
     expect(within(context).getByText('Validated change preview')).toBeVisible();
