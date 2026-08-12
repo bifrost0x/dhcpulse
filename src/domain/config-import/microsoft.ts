@@ -1,3 +1,4 @@
+import { SaxesParser } from 'saxes';
 import {
   deterministicConfigId,
   emptyDhcpConfiguration,
@@ -27,16 +28,11 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   if (/<!DOCTYPE\b|<!ENTITY\b/i.test(text)) {
     throw new ConfigImportError('UNSAFE_XML', 'XML declarations that can define external or custom entities are not allowed.');
   }
-  const document = new DOMParser().parseFromString(text, 'application/xml');
-  if (document.getElementsByTagName('parsererror').length > 0 || !document.documentElement) {
-    throw new ConfigImportError('MALFORMED_XML', 'Microsoft DHCP XML is malformed.');
-  }
   const format = 'microsoft-xml' as const;
-  const root = document.documentElement;
+  const root = parseXmlData(text);
   if (!['dhcpserverexport', 'dhcpserver'].includes(localName(root))) {
     throw new ConfigImportError('UNKNOWN_FORMAT', 'XML root is not a supported Microsoft DHCP export root.');
   }
-  assertXmlStructureBounds(root);
   const configuration = emptyDhcpConfiguration(format, 'Microsoft DHCP Server', fileName);
   configuration.metadata.version = attribute(root, 'version') ?? firstText(root, ['version']);
 
@@ -55,7 +51,7 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   const scopeElements = elements(root, ['scope', 'scopev4', 'scopev6']).filter((element) => {
     return Boolean(firstText(element, ['scopeid', 'subnetaddress', 'prefix']));
   });
-  const scopeByElement = new Map<Element, DhcpScope>();
+  const scopeByElement = new Map<XmlElement, DhcpScope>();
   for (const element of scopeElements) {
     const scopeAddress = firstText(element, ['scopeid', 'subnetaddress', 'prefix']);
     if (!scopeAddress) continue;
@@ -157,8 +153,8 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
     const name = firstText(element, ['name']);
     const valueElements = directElements(element, ['value', 'valuestring', 'data']);
     const value = valueElements.length > 1
-      ? valueElements.map((node) => node.textContent?.trim() ?? '').filter(Boolean)
-      : valueElements[0]?.textContent?.trim() ?? firstText(element, ['value', 'valuestring', 'data']);
+      ? valueElements.map((node) => nodeText(node).trim()).filter(Boolean)
+      : valueElements[0] ? nodeText(valueElements[0]).trim() : firstText(element, ['value', 'valuestring', 'data']);
     if (value === undefined || value === '') continue;
     const scope = nearestScope(element, scopeByElement);
     const protocol = scope?.protocol ?? (ancestryNames(element).some((item) => /ipv6|v6/.test(item)) ? 'dhcpv6' : 'dhcpv4');
@@ -240,7 +236,7 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
     'partner', 'dynamicdnsupdate', 'dnsupdatesettings', 'enabled', 'dynamicupdates',
     'domainname', 'domain', 'auditlog', 'auditsettings', 'enable', 'path', 'logfilepath',
   ]);
-  const unsupportedCount = Array.from(root.querySelectorAll('*')).filter(
+  const unsupportedCount = descendants(root).filter(
     (element) => !supportedElementNames.has(localName(element)),
   ).length;
   addWarning(configuration, 'unsupported-directive', unsupportedCount, '$', 'Microsoft XML contains unsupported element groups; values were omitted.');
@@ -250,79 +246,145 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   return configuration;
 }
 
-function assertXmlStructureBounds(root: Element): void {
-  const pending: Array<{ element: Element; depth: number }> = [{ element: root, depth: 0 }];
-  let nodes = 0;
-  while (pending.length > 0) {
-    const current = pending.pop();
-    if (!current) break;
-    nodes += 1;
-    if (nodes > MAX_STRUCTURE_NODES || current.depth > MAX_STRUCTURE_DEPTH) {
+interface XmlElement {
+  name: string;
+  attributes: Record<string, string>;
+  children: XmlElement[];
+  parent?: XmlElement;
+  text: string;
+}
+
+function parseXmlData(text: string): XmlElement {
+  const parser = new SaxesParser({ xmlns: true });
+  const stack: XmlElement[] = [];
+  let root: XmlElement | undefined;
+  let nodeCount = 0;
+  let parseError: Error | undefined;
+
+  parser.on('doctype', () => {
+    parseError = new ConfigImportError(
+      'UNSAFE_XML',
+      'XML declarations that can define external or custom entities are not allowed.',
+    );
+  });
+  parser.on('error', (error) => {
+    parseError = error;
+  });
+  parser.on('opentag', (tag) => {
+    nodeCount += 1;
+    const depth = stack.length;
+    if (nodeCount > MAX_STRUCTURE_NODES || depth > MAX_STRUCTURE_DEPTH) {
       throw new ConfigImportError(
         'STRUCTURE_TOO_COMPLEX',
         'Microsoft DHCP XML exceeds the supported depth or element limit.',
       );
     }
-    for (let child = current.element.lastElementChild; child; child = child.previousElementSibling) {
-      pending.push({ element: child, depth: current.depth + 1 });
-    }
+    const attributes = Object.fromEntries(
+      Object.values(tag.attributes).map((item) => [item.local.toLowerCase(), item.value]),
+    );
+    const element: XmlElement = {
+      name: tag.local.toLowerCase(),
+      attributes,
+      children: [],
+      text: '',
+      ...(stack.at(-1) ? { parent: stack.at(-1) } : {}),
+    };
+    if (element.parent) element.parent.children.push(element);
+    else if (!root) root = element;
+    stack.push(element);
+  });
+  const appendText = (value: string): void => {
+    const current = stack.at(-1);
+    if (current) current.text += value;
+  };
+  parser.on('text', appendText);
+  parser.on('cdata', appendText);
+  parser.on('closetag', () => {
+    stack.pop();
+  });
+
+  try {
+    parser.write(text).close();
+  } catch (error) {
+    if (error instanceof ConfigImportError) throw error;
+    parseError = error instanceof Error ? error : new Error('Unknown XML parsing error.');
   }
+  if (parseError || !root) {
+    throw new ConfigImportError('MALFORMED_XML', 'Microsoft DHCP XML is malformed.');
+  }
+  return root;
 }
 
-function elements(root: ParentNode, names: string[]): Element[] {
+function descendants(root: XmlElement): XmlElement[] {
+  const result: XmlElement[] = [];
+  const pending = [...root.children].reverse();
+  while (pending.length > 0) {
+    const element = pending.pop();
+    if (!element) break;
+    result.push(element);
+    pending.push(...element.children.slice().reverse());
+  }
+  return result;
+}
+
+function elements(root: XmlElement, names: string[]): XmlElement[] {
   const wanted = new Set(names.map((name) => name.toLowerCase()));
-  return Array.from(root.querySelectorAll('*')).filter((element) => wanted.has(localName(element)));
+  return descendants(root).filter((element) => wanted.has(localName(element)));
 }
 
-function directElements(root: Element, names: string[]): Element[] {
+function directElements(root: XmlElement, names: string[]): XmlElement[] {
   const wanted = new Set(names.map((name) => name.toLowerCase()));
-  return Array.from(root.children).filter((element) => wanted.has(localName(element)));
+  return root.children.filter((element) => wanted.has(localName(element)));
 }
 
-function localName(element: Element): string {
-  return (element.localName || element.tagName.split(':').at(-1) || '').toLowerCase();
+function localName(element: XmlElement): string {
+  return element.name;
 }
 
-function firstText(root: Element, names: string[]): string | undefined {
+function nodeText(element: XmlElement): string {
+  return `${element.text}${element.children.map(nodeText).join('')}`;
+}
+
+function firstText(root: XmlElement, names: string[]): string | undefined {
   const direct = directElements(root, names)[0];
-  if (direct?.textContent?.trim()) return direct.textContent.trim();
+  if (direct && nodeText(direct).trim()) return nodeText(direct).trim();
   const descendant = elements(root, names)[0];
-  return descendant?.textContent?.trim() || undefined;
+  return descendant ? nodeText(descendant).trim() || undefined : undefined;
 }
 
-function attribute(element: Element, name: string): string | undefined {
-  return Array.from(element.attributes).find((item) => item.localName.toLowerCase() === name.toLowerCase())?.value;
+function attribute(element: XmlElement, name: string): string | undefined {
+  return element.attributes[name.toLowerCase()];
 }
 
-function xmlPath(element: Element): string {
+function xmlPath(element: XmlElement): string {
   const parts: string[] = [];
-  let current: Element | null = element;
+  let current: XmlElement | undefined = element;
   while (current) {
     const name = localName(current);
-    const siblings = current.parentElement ? Array.from(current.parentElement.children).filter((item) => localName(item) === name) : [];
+    const siblings = current.parent ? current.parent.children.filter((item) => localName(item) === name) : [];
     const index = siblings.indexOf(current);
     parts.unshift(`${name}${siblings.length > 1 ? `[${index}]` : ''}`);
-    current = current.parentElement;
+    current = current.parent;
   }
   return `/${parts.join('/')}`;
 }
 
-function ancestryNames(element: Element): string[] {
+function ancestryNames(element: XmlElement): string[] {
   const names: string[] = [];
-  let current = element.parentElement;
+  let current = element.parent;
   while (current) {
     names.push(localName(current));
-    current = current.parentElement;
+    current = current.parent;
   }
   return names;
 }
 
-function nearestScope(element: Element, scopes: Map<Element, DhcpScope>): DhcpScope | undefined {
-  let current = element.parentElement;
+function nearestScope(element: XmlElement, scopes: Map<XmlElement, DhcpScope>): DhcpScope | undefined {
+  let current = element.parent;
   while (current) {
     const scope = scopes.get(current);
     if (scope) return scope;
-    current = current.parentElement;
+    current = current.parent;
   }
   return undefined;
 }
