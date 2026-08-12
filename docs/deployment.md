@@ -10,7 +10,7 @@ docker compose up -d --wait
 docker compose ps
 ```
 
-The included Compose service pulls `ghcr.io/bifrost0x/dhcpulse:latest`, publishes container port 8080, runs as UID/GID 101, drops all Linux capabilities, uses `no-new-privileges`, mounts only bounded temporary filesystems as writable, and keeps the root filesystem read-only. Set `DHCPULSE_IMAGE` to a versioned image tag or immutable digest for controlled deployments.
+The included Compose service pulls `ghcr.io/bifrost0x/dhcpulse:latest`, publishes container port 8080, runs as UID/GID 101, drops all Linux capabilities, uses `no-new-privileges`, mounts only bounded temporary filesystems as writable, and keeps the root filesystem read-only. For controlled deployments, copy the file and replace `latest` with a versioned image tag or immutable digest.
 
 To use another host port:
 
