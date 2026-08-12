@@ -1,5 +1,5 @@
 import type { ChangeSetResult, DhcpChangeOperation } from './dhcp-change-set';
-import type { MicrosoftWorkspace, WorkspaceEntityKind, WorkspaceFinding, WorkspaceNode } from './microsoft-workspace';
+import { buildMicrosoftWorkspace, type MicrosoftWorkspace, type WorkspaceEntityKind, type WorkspaceFinding, type WorkspaceNode } from './microsoft-workspace';
 
 export interface ScopeWorkspaceRow {
   scopeId: string;
@@ -137,10 +137,12 @@ export function evaluatePackageEligibility(workspace: MicrosoftWorkspace, result
     const scope = workspace.configuration.ipv4Scopes.find(({ id }) => id === scopeId);
     return !scope?.startRange || !scope.endRange;
   })) blockers.push('target-facts-missing');
-  const grouped = groupWorkspaceFindings(workspace);
+  const previewWorkspace = buildMicrosoftWorkspace(result.preview);
+  const grouped = groupWorkspaceFindings(previewWorkspace);
   if (grouped.some(({ severity, scopeIds }) => severity === 'blocker' && scopeIds.some((scopeId) => targetScopeIds.includes(scopeId)))) blockers.push('target-blocker-findings');
-  const warningCount = workspace.findings.filter((finding) => finding.severity === 'warning'
-    && findingScopeIds(finding, buildOwnership(workspace)).some((scopeId) => targetScopeIds.includes(scopeId))).length;
+  const previewOwnership = buildOwnership(previewWorkspace);
+  const warningCount = previewWorkspace.findings.filter((finding) => finding.severity === 'warning'
+    && findingScopeIds(finding, previewOwnership).some((scopeId) => targetScopeIds.includes(scopeId))).length;
   return {
     eligible: blockers.length === 0,
     blockers: [...new Set(blockers)],

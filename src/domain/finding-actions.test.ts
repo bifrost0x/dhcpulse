@@ -9,6 +9,7 @@ import {
   prepareFindingAction,
 } from './finding-actions';
 import { createChangeSet } from './dhcp-change-set';
+import { evaluatePackageEligibility } from './workspace-view';
 
 function workspace(text: string, fileName: string) {
   return buildConfigurationWorkspace(importDhcpConfiguration({ text, fileName }).configuration);
@@ -144,6 +145,60 @@ describe('finding actions', () => {
         rationaleFindingId: finding.id,
       }),
     ]);
+    expect(evaluatePackageEligibility(current, result)).toMatchObject({ eligible: true, blockers: [] });
+  });
+
+  it('offers duplicate cleanup only when every removed reservation has a rollback identity', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const original = imported.configuration.reservations[0]!;
+    const missingIdentity = { ...original, id: 'missing-identity', identifier: undefined };
+    const removable = { ...original, id: 'removable', identifier: '02:00:5e:10:00:99' };
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      reservations: [missingIdentity, removable],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'duplicate-reservation-address')!;
+
+    expect(listFindingActions(current, finding)[0]?.fields[0]?.options).toEqual([
+      expect.objectContaining({ value: missingIdentity.id }),
+    ]);
+    expect(() => prepareFindingAction(
+      current,
+      finding,
+      'resolve-duplicate-reservations',
+      createChangeSet(current),
+      { keepReservationId: removable.id },
+    )).toThrowError(expect.objectContaining<Partial<FindingActionError>>({
+      code: 'INVALID_INPUT',
+      fieldName: 'keepReservationId',
+    }));
+
+    const safe = prepareFindingAction(
+      current,
+      finding,
+      'resolve-duplicate-reservations',
+      createChangeSet(current),
+      { keepReservationId: missingIdentity.id },
+    );
+    expect(safe.valid).toBe(true);
+    expect(safe.changeSet.operations).toEqual([
+      expect.objectContaining({ kind: 'reservation.remove', targetId: removable.id }),
+    ]);
+  });
+
+  it('does not advertise duplicate cleanup when no rollback-safe keep choice exists', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const original = imported.configuration.reservations[0]!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      reservations: [
+        { ...original, id: 'missing-one', identifier: undefined },
+        { ...original, id: 'missing-two', identifier: undefined },
+      ],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'duplicate-reservation-address')!;
+
+    expect(listFindingActions(current, finding)).toEqual([]);
   });
 
   it('builds a guided reservation address correction from the imported before-state', () => {
@@ -173,6 +228,7 @@ describe('finding actions', () => {
       before: expect.objectContaining({ address: '198.51.100.50' }),
       after: expect.objectContaining({ address: '192.0.2.60' }),
     }));
+    expect(evaluatePackageEligibility(current, result)).toMatchObject({ eligible: true, blockers: [] });
   });
 
   it('offers guided correction for invalid address options', () => {
@@ -204,6 +260,7 @@ describe('finding actions', () => {
       before: expect.objectContaining({ optionId: option.id, value: 'not-an-address' }),
       after: expect.objectContaining({ code: 6, value: ['192.0.2.53', '192.0.2.54'], level: 'scope' }),
     }));
+    expect(evaluatePackageEligibility(current, result)).toMatchObject({ eligible: true, blockers: [] });
   });
 
   it('offers both deterministic ways to resolve a scope option override', () => {

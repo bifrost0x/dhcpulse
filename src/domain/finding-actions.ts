@@ -46,7 +46,8 @@ export function listFindingActions(
     case 'duplicate-reservation-address':
     case 'duplicate-reservation-identifier': {
       const reservations = findingReservations(workspace, finding);
-      if (reservations.length < 2) return [];
+      const keepChoices = rollbackSafeKeepChoices(reservations);
+      if (keepChoices.length === 0) return [];
       return [{
         id: 'resolve-duplicate-reservations',
         operationKind: 'reservation.remove',
@@ -55,8 +56,8 @@ export function listFindingActions(
           name: 'keepReservationId',
           type: 'select',
           required: true,
-          defaultValue: reservations[0]!.id,
-          options: reservations.map((reservation) => ({
+          defaultValue: keepChoices[0]!.id,
+          options: keepChoices.map((reservation) => ({
             value: reservation.id,
             label: reservation.hostname ?? reservation.address,
             detail: reservation.address,
@@ -133,7 +134,9 @@ function buildOperations(
   if (actionId === 'resolve-duplicate-reservations') {
     const keepId = required(values, 'keepReservationId');
     const reservations = findingReservations(workspace, finding);
-    if (!reservations.some(({ id }) => id === keepId)) throw new FindingActionError('INVALID_INPUT', 'keepReservationId');
+    if (!rollbackSafeKeepChoices(reservations).some(({ id }) => id === keepId)) {
+      throw new FindingActionError('INVALID_INPUT', 'keepReservationId');
+    }
     return reservations.filter(({ id }) => id !== keepId).map((reservation) => ({
       id: operationId(actionId, finding.id, reservation.id),
       kind: 'reservation.remove',
@@ -211,6 +214,13 @@ function buildSingleAddressExclusion(
 
 function findingReservations(workspace: ConfigurationWorkspace, finding: WorkspaceFinding) {
   return workspace.configuration.reservations.filter(({ id }) => finding.entityIds.includes(id));
+}
+
+function rollbackSafeKeepChoices(reservations: DhcpReservation[]): DhcpReservation[] {
+  if (reservations.length < 2) return [];
+  return reservations.filter((keep) => reservations.every((reservation) => (
+    reservation.id === keep.id || Boolean(reservation.identifier)
+  )));
 }
 
 function findingOptions(workspace: ConfigurationWorkspace, finding: WorkspaceFinding) {
