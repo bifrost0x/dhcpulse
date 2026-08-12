@@ -186,7 +186,9 @@ function OperationPreview({ locale, workspace, operation, result, title }: {
   const before = operation.kind === 'exclusion.add'
     ? (locale === 'de' ? 'Kein Ausschluss für diese Adresse' : 'No exclusion for this address')
     : 'before' in operation ? JSON.stringify(operation.before) : locale === 'de' ? 'Importierter Zustand' : 'Imported state';
-  const after = 'after' in operation ? JSON.stringify(operation.after) : locale === 'de' ? 'Geplanter Zustand' : 'Planned state';
+  const after = operation.kind === 'exclusion.add'
+    ? (operation.after.start === operation.after.end ? operation.after.start : `${operation.after.start} – ${operation.after.end}`)
+    : 'after' in operation ? JSON.stringify(operation.after) : locale === 'de' ? 'Geplanter Zustand' : 'Planned state';
   const issues = result.issues.filter(({ operationId }) => !operationId || operationId === operation.id);
   return <section className="remediation-preview" aria-live="polite">
     <h3>{locale === 'de' ? 'Validierte Änderungsvorschau' : 'Validated change preview'}</h3>
