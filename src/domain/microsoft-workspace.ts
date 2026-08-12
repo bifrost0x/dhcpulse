@@ -39,7 +39,21 @@ export type WorkspaceRemediationKind =
 
 export type WorkspaceActionId =
   | 'exclude-reserved-address'
-  | 'exclude-gateway-address';
+  | 'exclude-gateway-address'
+  | 'resolve-duplicate-reservations'
+  | 'update-reservation-address'
+  | 'set-valid-option-value'
+  | 'align-option-with-server'
+  | 'remove-scope-option'
+  | 'resize-scope-range'
+  | 'set-scope-lease'
+  | 'clone-scope'
+  | 'remove-exclusion'
+  | 'update-reservation'
+  | 'remove-reservation'
+  | 'set-option-value'
+  | 'remove-option'
+  | 'set-server-option';
 
 export interface WorkspaceRemediation {
   kind: WorkspaceRemediationKind;

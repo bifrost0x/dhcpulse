@@ -44,6 +44,7 @@ export interface PackageEligibility {
   blockers: string[];
   warnings: string[];
   targetScopeIds: string[];
+  newScopes: Array<{ cidr: string; name: string }>;
 }
 
 const severityRank = { blocker: 0, warning: 1, info: 2 } as const;
@@ -125,6 +126,10 @@ export function pageWorkspaceItems<T>(items: T[], requestedPage: number, pageSiz
 export function evaluatePackageEligibility(workspace: MicrosoftWorkspace, result: ChangeSetResult): PackageEligibility {
   const blockers: string[] = [];
   const targetScopeIds = [...new Set(result.changeSet.operations.flatMap((operation) => operationScopeIds(workspace, operation)))].sort();
+  const newScopes = result.changeSet.operations
+    .filter((operation): operation is Extract<DhcpChangeOperation, { kind: 'scope.clone' }> => operation.kind === 'scope.clone')
+    .map(({ after }) => ({ cidr: after.cidr, name: after.name }))
+    .sort((left, right) => left.cidr.localeCompare(right.cidr));
   if (result.changeSet.operations.length === 0) blockers.push('change-set-empty');
   if (!result.valid) blockers.push('change-set-invalid');
   if (!workspace.serverName) blockers.push('server-name-missing');
@@ -141,6 +146,7 @@ export function evaluatePackageEligibility(workspace: MicrosoftWorkspace, result
     blockers: [...new Set(blockers)],
     warnings: warningCount > 0 ? [`target-warning-findings:${warningCount}`] : [],
     targetScopeIds,
+    newScopes,
   };
 }
 
@@ -171,8 +177,9 @@ function operationScopeIds(workspace: MicrosoftWorkspace, operation: DhcpChangeO
     case 'scope-lease.set':
     case 'exclusion.add':
     case 'reservation.add':
-    case 'scope.clone':
       return [operation.targetId];
+    case 'scope.clone':
+      return [];
     case 'exclusion.remove':
       return [operation.before.scopeId];
     case 'reservation.update':

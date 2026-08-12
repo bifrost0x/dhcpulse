@@ -141,20 +141,19 @@ export function validateChangeSet(workspace: MicrosoftWorkspace, set: DhcpChange
   const issues: ChangeSetIssue[] = [];
   if (set.serverName !== workspace.serverName) addIssue(issues, undefined, 'server-mismatch', {});
   const ids = new Set<string>();
-  const conflicts = new Map<string, string>();
+  const earlierOperations: DhcpChangeOperation[] = [];
   for (const operation of set.operations) {
     if (ids.has(operation.id)) addIssue(issues, operation.id, 'duplicate-operation-id', {});
     ids.add(operation.id);
-    const conflictKey = operationConflictKey(operation);
-    const earlier = conflicts.get(conflictKey);
-    if (earlier) {
-      addIssue(issues, earlier, 'operation-conflict', { targetId: operation.targetId });
+    for (const earlier of earlierOperations) {
+      if (!operationsConflict(earlier, operation)) continue;
+      addIssue(issues, earlier.id, 'operation-conflict', { targetId: earlier.targetId });
       addIssue(issues, operation.id, 'operation-conflict', { targetId: operation.targetId });
-    } else {
-      conflicts.set(conflictKey, operation.id);
     }
+    earlierOperations.push(operation);
     validateOperation(workspace.configuration, operation, issues);
   }
+  validateCombinedScopeRanges(workspace.configuration, set.operations, issues);
   issues.sort((left, right) => compareText(left.operationId ?? '', right.operationId ?? '') || compareText(left.code, right.code));
   const valid = issues.every(({ severity }) => severity !== 'error');
   const preview = valid ? applyOperations(workspace.configuration, set.operations) : cloneConfiguration(workspace.configuration);
@@ -175,9 +174,6 @@ function validateOperation(configuration: DhcpConfiguration, operation: DhcpChan
       if (scope.startRange !== operation.before.start || scope.endRange !== operation.before.end) addIssue(issues, operation.id, 'before-state-mismatch', {});
       if (operation.before.start === operation.after.start && operation.before.end === operation.after.end) addIssue(issues, operation.id, 'no-op', {});
       validateRangeInScope(scope.cidr, operation.after.start, operation.after.end, operation.id, issues);
-      for (const exclusion of configuration.exclusions.filter(({ scopeId }) => scopeId === scope.id)) {
-        if (!rangeContains(operation.after.start, operation.after.end, exclusion.start, exclusion.end)) addIssue(issues, operation.id, 'exclusion-outside-new-range', { exclusionId: exclusion.id });
-      }
       break;
     }
     case 'scope-lease.set': {
@@ -247,8 +243,53 @@ function validateOperation(configuration: DhcpConfiguration, operation: DhcpChan
       else validateRangeInScope(cidr.cidr, operation.after.start, operation.after.end, operation.id, issues);
       if (!operation.after.name.trim()) addIssue(issues, operation.id, 'clone-name-missing', {});
       if (!positiveInteger(operation.after.leaseSeconds)) addIssue(issues, operation.id, 'invalid-lease-duration', { value: operation.after.leaseSeconds });
-      if (configuration.ipv4Scopes.some(({ cidr: existing }) => analyzeIpv4Cidr(existing)?.cidr === cidr?.cidr)) addIssue(issues, operation.id, 'duplicate-scope', {});
+      if (configuration.ipv4Scopes.some(({ cidr: existing }) => cidrsOverlap(existing, operation.after.cidr))) addIssue(issues, operation.id, 'duplicate-scope', {});
       break;
+    }
+  }
+}
+
+function validateCombinedScopeRanges(
+  configuration: DhcpConfiguration,
+  operations: DhcpChangeOperation[],
+  issues: ChangeSetIssue[],
+): void {
+  const removedExclusions = new Set(operations
+    .filter((operation): operation is Extract<DhcpChangeOperation, { kind: 'exclusion.remove' }> => operation.kind === 'exclusion.remove')
+    .map(({ targetId }) => targetId));
+  const additions = operations
+    .filter((operation): operation is Extract<DhcpChangeOperation, { kind: 'exclusion.add' }> => operation.kind === 'exclusion.add');
+  const replacedReservations = new Set(operations
+    .filter((operation): operation is Extract<DhcpChangeOperation, { kind: 'reservation.remove' | 'reservation.update' }> => operation.kind === 'reservation.remove' || operation.kind === 'reservation.update')
+    .map(({ targetId }) => targetId));
+  const reservationChanges = operations
+    .filter((operation): operation is Extract<DhcpChangeOperation, { kind: 'reservation.add' | 'reservation.update' }> => operation.kind === 'reservation.add' || operation.kind === 'reservation.update');
+
+  for (const range of operations.filter((operation): operation is Extract<DhcpChangeOperation, { kind: 'scope-range.set' }> => operation.kind === 'scope-range.set')) {
+    const scope = configuration.ipv4Scopes.find(({ id }) => id === range.targetId);
+    if (!scope) continue;
+    for (const exclusion of configuration.exclusions.filter(({ scopeId, id }) => scopeId === range.targetId && !removedExclusions.has(id))) {
+      if (!rangeContains(range.after.start, range.after.end, exclusion.start, exclusion.end)) {
+        addIssue(issues, range.id, 'exclusion-outside-new-range', { exclusionId: exclusion.id });
+      }
+    }
+    for (const addition of additions.filter(({ targetId }) => targetId === range.targetId)) {
+      if (!rangeContains(range.after.start, range.after.end, addition.after.start, addition.after.end)) {
+        addIssue(issues, addition.id, 'range-outside-scope', {});
+      }
+    }
+    for (const reservation of configuration.reservations.filter(({ scopeId, id }) => scopeId === range.targetId && !replacedReservations.has(id))) {
+      if (!rangeContains(range.after.start, range.after.end, reservation.address, reservation.address)) {
+        addIssue(issues, range.id, 'reservation-outside-scope', { reservationId: reservation.id });
+      }
+    }
+    for (const change of reservationChanges) {
+      const scopeId = change.kind === 'reservation.add'
+        ? change.targetId
+        : configuration.reservations.find(({ id }) => id === change.targetId)?.scopeId;
+      if (scopeId === range.targetId && !rangeContains(range.after.start, range.after.end, change.after.address, change.after.address)) {
+        addIssue(issues, change.id, 'reservation-outside-scope', { address: change.after.address });
+      }
     }
   }
 }
@@ -263,6 +304,9 @@ function validateReservation(
 ): void {
   const scope = configuration.ipv4Scopes.find(({ id }) => id === scopeId);
   if (!scope || !addressInCidr(state.address, scope.cidr)) addIssue(issues, operationId, 'reservation-outside-scope', { address: state.address });
+  else if (!scope.startRange || !scope.endRange || !rangeContains(scope.startRange, scope.endRange, state.address, state.address)) {
+    addIssue(issues, operationId, 'reservation-outside-scope', { address: state.address });
+  }
   const normalized = normalizeReservationIdentifier(state.clientId, 'client-id', true).identifier;
   if (!normalized) addIssue(issues, operationId, 'reservation-identifier-missing', {});
   for (const reservation of configuration.reservations.filter(({ id }) => id !== ignoredReservationId)) {
@@ -400,8 +444,26 @@ function applyOperations(configuration: DhcpConfiguration, operations: DhcpChang
   return preview;
 }
 
+function operationsConflict(left: DhcpChangeOperation, right: DhcpChangeOperation): boolean {
+  if (left.kind === 'scope.clone' && right.kind === 'scope.clone') return cidrsOverlap(left.after.cidr, right.after.cidr);
+  if (left.kind === 'exclusion.add' && right.kind === 'exclusion.add') {
+    return left.targetId === right.targetId && rangesOverlap(left.after.start, left.after.end, right.after.start, right.after.end);
+  }
+  if (left.kind === 'reservation.add' && right.kind === 'reservation.add') {
+    const leftClient = normalizeReservationIdentifier(left.after.clientId, 'client-id', true).identifier;
+    const rightClient = normalizeReservationIdentifier(right.after.clientId, 'client-id', true).identifier;
+    return left.targetId === right.targetId && (left.after.address === right.after.address || Boolean(leftClient && rightClient && leftClient === rightClient));
+  }
+  return operationConflictKey(left) === operationConflictKey(right);
+}
+
 function operationConflictKey(operation: DhcpChangeOperation): string {
-  if (operation.kind === 'option.set') return `${operation.kind}:${operation.targetId}:${operation.after.level}:${operation.after.code}`;
+  if (operation.kind === 'reservation.update' || operation.kind === 'reservation.remove') return `reservation:${operation.targetId}`;
+  if (operation.kind === 'option.set') return operation.before?.optionId
+    ? `option:${operation.before.optionId}`
+    : `option-target:${operation.targetId}:${operation.after.level}:${operation.after.code}`;
+  if (operation.kind === 'option.remove') return `option:${operation.targetId}`;
+  if (operation.kind === 'scope.clone' || operation.kind === 'exclusion.add' || operation.kind === 'reservation.add') return `${operation.kind}:${operation.id}`;
   return `${operation.kind}:${operation.targetId}`;
 }
 
@@ -438,6 +500,12 @@ function rangesOverlap(leftStart: string, leftEnd: string, rightStart: string, r
   const rightLower = parseIpv4(rightStart);
   const rightUpper = parseIpv4(rightEnd);
   return leftLower !== null && leftUpper !== null && rightLower !== null && rightUpper !== null && leftLower <= rightUpper && rightLower <= leftUpper;
+}
+
+function cidrsOverlap(leftValue: string, rightValue: string): boolean {
+  const left = analyzeIpv4Cidr(leftValue);
+  const right = analyzeIpv4Cidr(rightValue);
+  return Boolean(left && right && rangesOverlap(left.network, left.broadcast, right.network, right.broadcast));
 }
 
 function addressInCidr(addressValue: string, cidrValue: string): boolean {

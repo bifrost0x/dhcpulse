@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck,
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { Locale } from '../../content/copy';
 import { createChangeSet, type ChangeSetResult, type DhcpChangeOperation } from '../../domain/dhcp-change-set';
-import { prepareFindingAction } from '../../domain/finding-actions';
+import { listFindingActions, prepareFindingAction } from '../../domain/finding-actions';
 import type { ConfigurationWorkspace, WorkspaceFinding } from '../../domain/config-workspace';
 import {
   buildRemediationContext,
@@ -13,6 +13,8 @@ import {
   type RemediationQueueItem,
   type RemediationSection,
 } from '../../domain/remediation-queue';
+import { WorkspaceActionComposer } from './WorkspaceActionComposer';
+import { operationTargetLabel } from './workspace-display';
 
 interface Explanation { rationale: string; impact: string; recommendation: string }
 
@@ -24,6 +26,7 @@ interface Props {
   explanationFor: (ruleId: string) => Explanation;
   evidenceLabel: (key: string) => string;
   onPrepare: (finding: WorkspaceFinding) => void;
+  onPrepareResult: (result: ChangeSetResult) => void;
   onOpenObject: (id: string) => void;
   onReviewChanges: () => void;
 }
@@ -37,7 +40,7 @@ export interface RemediationQueueHandle {
 
 export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(function RemediationQueue({
   locale, workspace, result, titleFor, explanationFor, evidenceLabel,
-  onPrepare, onOpenObject, onReviewChanges,
+  onPrepare, onPrepareResult, onOpenObject, onReviewChanges,
 }, ref) {
   const queue = useMemo(() => buildRemediationQueue(workspace, result), [workspace, result]);
   const allItems = sectionOrder.flatMap((section) => queue.sections[section]);
@@ -121,6 +124,10 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
 
   function renderContextPanel() {
     if (!context || !selected) return null;
+    const actions = listFindingActions(workspace, context.finding);
+    const legacyAction = actions.length === 1
+      && (actions[0]!.id === 'exclude-reserved-address' || actions[0]!.id === 'exclude-gateway-address');
+    const composerActions = legacyAction ? [] : actions;
     return <aside className="planner-card remediation-context" aria-label={locale === 'de' ? 'Befundkontext' : 'Finding context'}>
       <header><span className={`remediation-severity finding-${context.finding.severity}`}>{severityLabel(context.finding.severity, locale)}</span><h2 ref={contextHeadingRef} tabIndex={-1}>{titleFor(context.finding.ruleId)}</h2><small>{context.scopeLabel ?? (locale === 'de' ? 'Globaler Kontext' : 'Global context')}</small></header>
       {context.occurrenceCount > 1 && <div className="remediation-occurrence"><button type="button" aria-label={locale === 'de' ? 'Vorheriger Befund' : 'Previous occurrence'} disabled={context.occurrenceIndex === 0} onClick={() => { setPreview(null); setOccurrenceIndex((value) => Math.max(0, value - 1)); }}><ChevronLeft size={17} /></button><span>{locale === 'de' ? 'Vorkommen' : 'Occurrence'} {context.occurrenceIndex + 1} {locale === 'de' ? 'von' : 'of'} {context.occurrenceCount}</span><button type="button" aria-label={locale === 'de' ? 'Nächster Befund' : 'Next occurrence'} disabled={context.occurrenceIndex + 1 >= context.occurrenceCount} onClick={() => { setPreview(null); setOccurrenceIndex((value) => Math.min(context.occurrenceCount - 1, value + 1)); }}><ChevronRight size={17} /></button></div>}
@@ -129,9 +136,18 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
       <ContextBlock title={locale === 'de' ? 'Empfehlung' : 'Recommendation'} text={explanationFor(context.finding.ruleId).recommendation} />
       <section className="remediation-evidence"><h3>{locale === 'de' ? 'Evidenz' : 'Evidence'}</h3><dl>{Object.entries(context.finding.evidence).map(([key, value]) => <div key={key}><dt>{evidenceLabel(key)}</dt><dd>{String(value)}</dd></div>)}</dl></section>
       <section className="remediation-provenance"><h3>{locale === 'de' ? 'Quelle und Beziehungen' : 'Source and relationships'}</h3><p>{context.finding.source}</p><p>{context.entityIds.length} {locale === 'de' ? 'verknüpfte Objekte' : 'linked objects'} · {context.relatedFindingIds.length} {locale === 'de' ? 'verwandte Befunde' : 'related findings'}</p></section>
+      {!preparedIds.has(context.finding.id) && composerActions.length > 0 && <WorkspaceActionComposer
+        locale={locale}
+        workspace={workspace}
+        subjectKey={`finding:${context.finding.id}`}
+        actions={composerActions}
+        currentResult={result}
+        build={(action, values) => prepareFindingAction(workspace, context.finding, action.id, result?.changeSet ?? createChangeSet(workspace), values)}
+        onCommit={onPrepareResult}
+      />}
       {preview && !preparedIds.has(context.finding.id) && <OperationPreview locale={locale} workspace={workspace} operation={preview.changeSet.operations.at(-1)!} result={preview} title={titleFor(context.finding.ruleId)} />}
       {preparedIds.has(context.finding.id) && result && <OperationPreview locale={locale} workspace={workspace} operation={result.changeSet.operations.find(({ rationaleFindingId }) => rationaleFindingId === context.finding.id)!} result={result} title={titleFor(context.finding.ruleId)} />}
-      <footer>{context.finding.entityIds[0] && <button type="button" className="text-button" onClick={() => onOpenObject(context.finding.entityIds[0]!)}>{locale === 'de' ? 'Objekt öffnen' : 'Open object'}</button>}<a className="text-button" href={context.finding.sources[0]} target="_blank" rel="noreferrer">{locale === 'de' ? 'Herstellerdokumentation' : 'Vendor documentation'}</a>{selected.actionable && !preparedIds.has(context.finding.id) && !preview && <button type="button" className="primary-button" onClick={() => previewAction(context.finding)}>{locale === 'de' ? 'Änderung prüfen' : 'Preview change'}</button>}{preview && !preparedIds.has(context.finding.id) && <button type="button" className="primary-button" onClick={() => { onPrepare(context.finding); setPreview(null); }}>{locale === 'de' ? 'Zur Prüfung hinzufügen' : 'Add to review'}</button>}</footer>
+      <footer>{context.finding.entityIds[0] && <button type="button" className="text-button" onClick={() => onOpenObject(context.finding.entityIds[0]!)}>{locale === 'de' ? 'Objekt öffnen' : 'Open object'}</button>}<a className="text-button" href={context.finding.sources[0]} target="_blank" rel="noreferrer">{locale === 'de' ? 'Herstellerdokumentation' : 'Vendor documentation'}</a>{legacyAction && !preparedIds.has(context.finding.id) && !preview && <button type="button" className="primary-button" onClick={() => previewAction(context.finding)}>{locale === 'de' ? 'Änderung prüfen' : 'Preview change'}</button>}{preview && !preparedIds.has(context.finding.id) && <button type="button" className="primary-button" disabled={!preview.valid} onClick={() => { if (!preview.valid) return; onPrepare(context.finding); setPreview(null); }}>{locale === 'de' ? 'Zur Prüfung hinzufügen' : 'Add to review'}</button>}</footer>
     </aside>;
   }
 
@@ -182,7 +198,6 @@ function OperationPreview({ locale, workspace, operation, result, title }: {
   result: ChangeSetResult;
   title: string;
 }) {
-  const scope = workspace.configuration.ipv4Scopes.find(({ id }) => id === operation.targetId);
   const before = operation.kind === 'exclusion.add'
     ? (locale === 'de' ? 'Kein Ausschluss für diese Adresse' : 'No exclusion for this address')
     : 'before' in operation ? JSON.stringify(operation.before) : locale === 'de' ? 'Importierter Zustand' : 'Imported state';
@@ -193,7 +208,7 @@ function OperationPreview({ locale, workspace, operation, result, title }: {
   return <section className="remediation-preview" aria-live="polite">
     <h3>{locale === 'de' ? 'Validierte Änderungsvorschau' : 'Validated change preview'}</h3>
     <dl>
-      <div><dt>{locale === 'de' ? 'Ziel' : 'Target'}</dt><dd>{scope ? `${scope.name ?? scope.cidr} · ${scope.cidr}` : operation.targetId}</dd></div>
+      <div><dt>{locale === 'de' ? 'Ziel' : 'Target'}</dt><dd>{operationTargetLabel(workspace, operation, locale)}</dd></div>
       <div><dt>{locale === 'de' ? 'Aktion' : 'Action'}</dt><dd>{operationLabel(operation.kind, locale)}</dd></div>
       <div><dt>{locale === 'de' ? 'Begründung' : 'Rationale'}</dt><dd>{title}</dd></div>
       <div><dt>{locale === 'de' ? 'Vorher' : 'Before'}</dt><dd>{before}</dd></div>
