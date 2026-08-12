@@ -49,6 +49,9 @@ export async function generatePowerShellPackage(
   locale: Locale,
   generatedAt: Date,
 ): Promise<PowerShellPackage> {
+  if (workspace.configuration.metadata.source.format !== 'microsoft-xml') {
+    throw new Error('A Microsoft DHCP XML export is required for package generation.');
+  }
   if (!result.valid || result.changeSet.operations.length === 0) {
     throw new Error('A valid non-empty change set is required.');
   }

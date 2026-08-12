@@ -7,21 +7,23 @@ import { Dhcpv6Tool } from '../tools/Dhcpv6Tool';
 import { DiagnosticsTool } from '../tools/DiagnosticsTool';
 import { FailoverTool } from '../tools/FailoverTool';
 import { LeaseTool } from '../tools/LeaseTool';
-import { MicrosoftWorkspaceTool } from '../tools/MicrosoftWorkspaceTool';
 import { OptionsTool } from '../tools/OptionsTool';
 import { PxeTool } from '../tools/PxeTool';
 import { ScopeTool } from '../tools/ScopeTool';
 import { SecurityTool } from '../tools/SecurityTool';
 import type { ToolPanelProps } from '../tools/ToolPanel';
+import type { ConfigurationWorkspace } from '../domain/config-workspace';
+import { ConfigurationEntry } from './config-workspace/ConfigurationEntry';
+import { ConfigurationWorkspaceView } from './config-workspace/ConfigurationWorkspaceView';
 import { Header } from './Header';
-import { ToolCatalog } from './ToolCatalog';
 import { ToolFrame } from './ToolFrame';
+import { UtilitiesCatalog } from './UtilitiesCatalog';
 
 type ToolId = ToolCatalogEntry['id'];
-type Route = { kind: 'catalog' } | { kind: 'tool'; id: ToolId } | { kind: 'not-found' };
+type UtilityToolId = Exclude<ToolId, 'microsoft-workspace'>;
+type Route = { kind: 'entry' } | { kind: 'workspace' } | { kind: 'utilities' } | { kind: 'tool'; id: ToolId } | { kind: 'not-found' };
 
-const toolComponents: Record<Exclude<ToolId, 'lease'>, ComponentType<ToolPanelProps>> = {
-  'microsoft-workspace': MicrosoftWorkspaceTool,
+const toolComponents: Record<Exclude<UtilityToolId, 'lease'>, ComponentType<ToolPanelProps>> = {
   scope: ScopeTool,
   options: OptionsTool,
   pxe: PxeTool,
@@ -34,8 +36,11 @@ const toolComponents: Record<Exclude<ToolId, 'lease'>, ComponentType<ToolPanelPr
 };
 
 function routeFromHash(hash: string): Route {
-  if (!hash.startsWith('#/tool/')) return { kind: 'catalog' };
+  if (hash === '#/workspace') return { kind: 'workspace' };
+  if (hash === '#/utilities') return { kind: 'utilities' };
+  if (!hash.startsWith('#/tool/')) return { kind: 'entry' };
   const requestedId = hash.slice('#/tool/'.length);
+  if (requestedId === 'microsoft-workspace') return { kind: 'entry' };
   const tool = toolCatalog.find(({ id }) => id === requestedId);
   return tool ? { kind: 'tool', id: tool.id } : { kind: 'not-found' };
 }
@@ -47,6 +52,7 @@ interface WorkbenchShellProps {
 
 export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) {
   const [route, setRoute] = useState<Route>(() => routeFromHash(window.location.hash));
+  const [workspaceSession, setWorkspaceSession] = useState<{ workspace: ConfigurationWorkspace; fileName: string } | null>(null);
   const [toolResetVersion, setToolResetVersion] = useState(0);
   const routeHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousRouteKindRef = useRef<Route['kind'] | null>(null);
@@ -61,15 +67,15 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
 
   useEffect(() => {
     const previousRouteKind = previousRouteKindRef.current;
-    const returningToCatalog = route.kind === 'catalog'
+    const returningToEntry = route.kind === 'entry'
       && previousRouteKind !== null
-      && previousRouteKind !== 'catalog';
-    if (route.kind !== 'catalog' || returningToCatalog) routeHeadingRef.current?.focus();
+      && previousRouteKind !== 'entry';
+    if (route.kind !== 'entry' || returningToEntry) routeHeadingRef.current?.focus();
     previousRouteKindRef.current = route.kind;
   }, [route.kind, routeKey]);
 
   function showCatalog() {
-    setRoute({ kind: 'catalog' });
+    setRoute({ kind: 'utilities' });
   }
 
   function backFromNotFound(event: MouseEvent<HTMLAnchorElement>) {
@@ -77,24 +83,29 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
   }
 
   let mainContent;
-  if (route.kind === 'catalog') {
+  if (route.kind === 'entry' || (route.kind === 'workspace' && !workspaceSession)) {
     mainContent = (
-      <>
-        <section className="catalog-hero">
-          <p className="eyebrow"><span className="pulse-dot" />{t('shell.eyebrow')}</p>
-          <h1 ref={routeHeadingRef} tabIndex={-1}>{t('shell.title')}</h1>
-          <p>{t('shell.description')}</p>
-        </section>
-        <ToolCatalog locale={locale} onToolSelect={(id) => setRoute({ kind: 'tool', id })} />
-      </>
+      <ConfigurationEntry locale={locale} headingRef={routeHeadingRef} notice={route.kind === 'workspace' ? (locale === 'de' ? 'Diese Arbeitsbereich-Sitzung ist nicht mehr verfügbar. Öffne die Konfiguration erneut.' : 'This workspace session is no longer available. Open the configuration again.') : undefined} onOpen={(workspace, fileName) => {
+        setWorkspaceSession({ workspace, fileName });
+        window.location.hash = '#/workspace';
+        setRoute({ kind: 'workspace' });
+      }} />
     );
+  } else if (route.kind === 'workspace') {
+    mainContent = <ConfigurationWorkspaceView locale={locale} workspace={workspaceSession!.workspace} fileName={workspaceSession!.fileName} headingRef={routeHeadingRef} onClose={() => {
+      setWorkspaceSession(null);
+      window.location.hash = '#/';
+      setRoute({ kind: 'entry' });
+    }} />;
+  } else if (route.kind === 'utilities') {
+    mainContent = <UtilitiesCatalog locale={locale} headingRef={routeHeadingRef} onToolSelect={(id) => setRoute({ kind: 'tool', id })} />;
   } else if (route.kind === 'not-found') {
     mainContent = (
       <section className="not-found planner-card">
         <p className="section-kicker">404</p>
         <h1 ref={routeHeadingRef} tabIndex={-1}>{t('notFound.title')}</h1>
         <p>{t('notFound.description')}</p>
-        <a className="primary-button" href="#/" onClick={backFromNotFound}>{t('frame.back')}</a>
+        <a className="primary-button" href="#/utilities" onClick={backFromNotFound}>{t('frame.back')}</a>
       </section>
     );
   } else {
@@ -106,7 +117,7 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
         </ToolFrame>
       );
     } else {
-      const Panel = toolComponents[tool.id];
+      const Panel = toolComponents[route.id as Exclude<UtilityToolId, 'lease'>];
       mainContent = (
         <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setToolResetVersion((current) => current + 1)}>
           <Panel key={`${tool.id}-${toolResetVersion}`} locale={locale} tool={tool} />

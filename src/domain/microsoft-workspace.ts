@@ -37,6 +37,10 @@ export type WorkspaceRemediationKind =
   | 'reservation.update'
   | 'option.set';
 
+export type WorkspaceActionId =
+  | 'exclude-reserved-address'
+  | 'exclude-gateway-address';
+
 export interface WorkspaceRemediation {
   kind: WorkspaceRemediationKind;
   targetId: string;
@@ -49,9 +53,13 @@ export interface WorkspaceFinding {
   entityIds: string[];
   titleKey: string;
   rationaleKey: string;
+  impactKey: string;
+  recommendationKey: string;
   evidence: Record<string, string | number | boolean>;
   source: string;
-  confidence: 'certain' | 'assumption-dependent';
+  sources: string[];
+  confidence: 'certain' | 'limited' | 'assumption-dependent';
+  actionId?: WorkspaceActionId;
   remediation?: WorkspaceRemediation;
 }
 
@@ -104,6 +112,9 @@ const SOURCES = {
   dhcp: 'https://www.rfc-editor.org/rfc/rfc2131.html',
   options: 'https://www.iana.org/assignments/bootp-dhcp-parameters/',
   microsoft: 'https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-top',
+  kea: 'https://kea.readthedocs.io/en/latest/arm/config.html',
+  isc: 'https://kb.isc.org/docs/isc-dhcp-44-manual-pages-dhcpdconf',
+  dnsmasq: 'https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html',
 } as const;
 
 const severityRank = { blocker: 0, warning: 1, info: 2 } as const;
@@ -265,8 +276,9 @@ function buildFindings(
   scopeSummaries: Record<string, WorkspaceScopeSummary>,
 ): WorkspaceFinding[] {
   const findings: WorkspaceFinding[] = [];
+  const vendorSource = sourceForFormat(configuration.metadata.source.format);
   for (const warning of configuration.parserWarnings) {
-    addFinding(findings, 'parser-warning', 'warning', [], { code: warning.code, count: warning.count, location: warning.provenance.location }, SOURCES.microsoft);
+    addFinding(findings, 'parser-warning', 'warning', [], { code: warning.code, count: warning.count, location: warning.provenance.location }, vendorSource, undefined, undefined, 'limited');
   }
 
   const reservationsByAddress = groupBy(configuration.reservations.filter(({ protocol }) => protocol === 'dhcpv4'), ({ address }) => address.toLocaleLowerCase());
@@ -293,7 +305,7 @@ function buildFindings(
       }
       const pool = pools.find((candidate) => addressInRange(reservation.address, candidate.start, candidate.end));
       if (pool) {
-        addFinding(findings, 'reservation-in-dynamic-pool', 'warning', [reservation.id, scope.id], { address: reservation.address, poolStart: pool.start, poolEnd: pool.end }, SOURCES.microsoft, { kind: 'exclusion.add', targetId: scope.id });
+        addFinding(findings, 'reservation-in-dynamic-pool', 'warning', [reservation.id, scope.id], { address: reservation.address, poolStart: pool.start, poolEnd: pool.end }, vendorSource, { kind: 'exclusion.add', targetId: scope.id }, 'exclude-reserved-address');
       }
     }
 
@@ -306,7 +318,7 @@ function buildFindings(
       if (option.code === 3) {
         for (const address of addresses) {
           const pool = pools.find((candidate) => addressInRange(address, candidate.start, candidate.end));
-          if (pool) addFinding(findings, 'gateway-in-dynamic-pool', 'warning', [option.id, scope.id], { address, poolStart: pool.start, poolEnd: pool.end }, SOURCES.dhcp, { kind: 'exclusion.add', targetId: scope.id });
+          if (pool) addFinding(findings, 'gateway-in-dynamic-pool', 'warning', [option.id, scope.id], { address, poolStart: pool.start, poolEnd: pool.end }, SOURCES.dhcp, { kind: 'exclusion.add', targetId: scope.id }, 'exclude-gateway-address');
         }
       }
     }
@@ -340,6 +352,8 @@ function addFinding(
   evidence: WorkspaceFinding['evidence'],
   source: string,
   remediation?: WorkspaceRemediation,
+  actionId?: WorkspaceActionId,
+  confidence: WorkspaceFinding['confidence'] = 'certain',
 ): void {
   findings.push({
     id: deterministicConfigId('workspace-finding', ruleId, ...entityIds),
@@ -348,11 +362,24 @@ function addFinding(
     entityIds,
     titleKey: `workspace.finding.${ruleId}.title`,
     rationaleKey: `workspace.finding.${ruleId}.rationale`,
+    impactKey: `workspace.finding.${ruleId}.impact`,
+    recommendationKey: `workspace.finding.${ruleId}.recommendation`,
     evidence,
     source,
-    confidence: 'certain',
+    sources: [source],
+    confidence,
+    ...(actionId ? { actionId } : {}),
     ...(remediation ? { remediation } : {}),
   });
+}
+
+function sourceForFormat(format: DhcpConfiguration['metadata']['source']['format']): string {
+  switch (format) {
+    case 'microsoft-xml': return SOURCES.microsoft;
+    case 'kea-json': return SOURCES.kea;
+    case 'isc-dhcpd': return SOURCES.isc;
+    case 'dnsmasq': return SOURCES.dnsmasq;
+  }
 }
 
 function generationReasons(configuration: DhcpConfiguration): string[] {

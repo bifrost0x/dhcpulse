@@ -4,15 +4,15 @@ DHCPulse is designed as a static, local-only application. It has no application 
 
 ## What the browser processes
 
-Interactive values are held in JavaScript memory in the current browser tab. The configuration analyzer and comparison tools access a user-selected file through the browser File API and read its text in browser memory. After a successful import, the raw text is removed from application state; the normalized configuration remains in volatile memory while the tool is open so the analysis or comparison can be displayed.
+Interactive values are held in JavaScript memory in the current browser tab. The configuration workspace and comparison utility access a user-selected file through the browser File API and read its text in browser memory. The file is rejected above 2 MiB before `File.text()` is called. After a successful workspace import, the raw text is removed from application state; the normalized configuration remains in volatile memory while the workspace is open.
 
 Analyzer and comparison reports are redacted by default when they originate from imported configurations. Redaction is a sharing safeguard, not a guarantee that every possible vendor-specific secret or identifier will be recognized. Review every report before sharing it.
 
-Microsoft workspace change packages are operational artifacts, not shareable redacted reports. They intentionally preserve the server, scope, address, reservation, and option values required for review and execution. Treat every generated package like its source configuration and keep it under appropriate access control.
+Microsoft workspace change packages are operational artifacts, not shareable redacted reports. They intentionally preserve the server, scope, address, reservation, and option values required for review and execution. They can only be created from a Microsoft XML workspace through allow-listed typed operations and the change-set validator. Treat every generated package like its source configuration and keep it under appropriate access control.
 
-Downloads are created from an in-memory `Blob`. DHCPulse creates a temporary object URL, activates the browser download, and revokes the object URL immediately afterward. The browser and operating system control the resulting downloaded file.
+Downloads are created from an in-memory `Blob`. One-shot report downloads use a temporary object URL that is revoked immediately after activation. Guarded package links remain available only while the package view is open so every artifact can be downloaded; DHCPulse revokes all of those object URLs when the view is closed or reset. The browser and operating system control the resulting downloaded files.
 
-Resetting a tool restores its synthetic defaults and clears its current application state. Navigating away from a tool, reloading, or closing the tab discards that state. DHCPulse implements no cookies, local storage, session storage, IndexedDB, service worker cache, account, database, or cloud persistence.
+Opening another configuration discards the active workspace. Resetting a utility restores its synthetic defaults and clears its current application state. Reloading or closing the tab discards all state. DHCPulse implements no cookies, local storage, session storage, IndexedDB, service worker cache, account, database, or cloud persistence.
 
 ## What DHCPulse does not do
 

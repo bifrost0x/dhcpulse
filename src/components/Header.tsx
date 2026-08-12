@@ -11,7 +11,7 @@ export function Header({ locale, onLocaleChange }: HeaderProps) {
 
   return (
     <header className="site-header">
-      <a className="brand" href="#top" aria-label={t('nav.home')}>
+      <a className="brand" href="#/" aria-label={t('nav.home')}>
         <img src="./dhcpulse-mark.svg" alt="" width="38" height="38" />
         <span>
           <strong>{t('app.name')}</strong>

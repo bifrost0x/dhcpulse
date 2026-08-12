@@ -143,6 +143,31 @@ describe('PowerShell change package', () => {
     const hostileWorkspace = { ...workspace, serverName: 'server\nWrite-Host unsafe' };
     await expect(generatePowerShellPackage(hostileWorkspace, { ...clean, changeSet: { ...clean.changeSet, serverName: hostileWorkspace.serverName } }, 'en', new Date())).rejects.toThrow('server name');
   });
+
+  it('refuses package generation when the source is not a Microsoft DHCP XML export', async () => {
+    const { configuration, workspace } = setup();
+    const result = addChangeOperation(workspace, createChangeSet(workspace), {
+      id: 'lease-1',
+      kind: 'scope-lease.set',
+      targetId: configuration.ipv4Scopes[0]!.id,
+      beforeSeconds: 28_800,
+      afterSeconds: 86_400,
+    });
+    const foreignWorkspace = {
+      ...workspace,
+      configuration: {
+        ...workspace.configuration,
+        metadata: {
+          ...workspace.configuration.metadata,
+          source: { ...workspace.configuration.metadata.source, format: 'kea-json' as const },
+        },
+      },
+    };
+
+    await expect(generatePowerShellPackage(foreignWorkspace, result, 'en', new Date())).rejects.toThrow(
+      'Microsoft DHCP XML export',
+    );
+  });
 });
 
 async function sha256(value: string): Promise<string> {

@@ -11,6 +11,8 @@ import {
   ConfigImportError,
   durationSeconds,
   maskToPrefix,
+  MAX_STRUCTURE_DEPTH,
+  MAX_STRUCTURE_NODES,
   numberOr,
   normalizeReservationIdentifier,
   numeric,
@@ -34,6 +36,7 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
   if (!['dhcpserverexport', 'dhcpserver'].includes(localName(root))) {
     throw new ConfigImportError('UNKNOWN_FORMAT', 'XML root is not a supported Microsoft DHCP export root.');
   }
+  assertXmlStructureBounds(root);
   const configuration = emptyDhcpConfiguration(format, 'Microsoft DHCP Server', fileName);
   configuration.metadata.version = attribute(root, 'version') ?? firstText(root, ['version']);
 
@@ -245,6 +248,25 @@ export function importMicrosoftXml(text: string, fileName?: string): DhcpConfigu
     addWarning(configuration, 'partial-parse', 1, '$', 'Microsoft XML import is a bounded subset and does not claim complete schema fidelity.');
   }
   return configuration;
+}
+
+function assertXmlStructureBounds(root: Element): void {
+  const pending: Array<{ element: Element; depth: number }> = [{ element: root, depth: 0 }];
+  let nodes = 0;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) break;
+    nodes += 1;
+    if (nodes > MAX_STRUCTURE_NODES || current.depth > MAX_STRUCTURE_DEPTH) {
+      throw new ConfigImportError(
+        'STRUCTURE_TOO_COMPLEX',
+        'Microsoft DHCP XML exceeds the supported depth or element limit.',
+      );
+    }
+    for (let child = current.element.lastElementChild; child; child = child.previousElementSibling) {
+      pending.push({ element: child, depth: current.depth + 1 });
+    }
+  }
 }
 
 function elements(root: ParentNode, names: string[]): Element[] {

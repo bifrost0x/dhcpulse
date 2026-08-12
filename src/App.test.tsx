@@ -2,8 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import dnsmasq from './test/fixtures/dnsmasq.conf?raw';
+import iscDhcpd from './test/fixtures/isc-dhcpd.conf?raw';
+import kea from './test/fixtures/kea.json?raw';
 import microsoftXml from './test/fixtures/microsoft-dhcp.xml?raw';
-import largeMicrosoftXml from '../samples/microsoft-dhcp-realistic-large.xml?raw';
 
 const toolNames = [
   'Microsoft DHCP Config Workspace',
@@ -32,147 +34,475 @@ function deferred<T>() {
 
 describe('DHCPulse Workbench', () => {
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     window.history.replaceState(null, '', '/');
   });
 
-  it('renders all stable tool links, their groups, and a live tool count', () => {
+  it('starts with configuration import instead of a specialist tool catalog', () => {
     renderAt();
 
-    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toBeVisible();
-    expect(screen.getByText('11 tools ready')).toBeVisible();
-    for (const group of ['Plan', 'Build', 'Analyze', 'Troubleshoot', 'Secure']) {
-      expect(screen.getByRole('heading', { name: group })).toBeVisible();
-    }
-    for (const name of toolNames) {
-      expect(screen.getByRole('link', { name: new RegExp(name) })).toHaveAttribute('href', expect.stringContaining('#/tool/'));
-    }
+    expect(screen.getByRole('heading', { name: 'Understand and improve your DHCP configuration' })).toBeVisible();
+    expect(screen.getByLabelText('DHCP configuration file')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Open Microsoft example' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open utilities' })).toHaveAttribute('href', '#/utilities');
+    expect(screen.queryByText('11 tools ready')).not.toBeInTheDocument();
   });
 
-  it('opens a Microsoft export as a navigable object workspace', async () => {
+  it('rejects oversized primary imports before reading and cancels a pending read on route exit', async () => {
     const user = userEvent.setup();
-    renderAt('#/tool/microsoft-workspace');
-
-    expect(screen.getByRole('heading', { name: 'Microsoft DHCP Config Workspace' })).toHaveFocus();
-    expect(screen.getByRole('heading', { name: 'Open a Microsoft DHCP export' })).toBeVisible();
-    const file = new File([microsoftXml], 'corp-dhcp.xml', { type: 'application/xml' });
-    await user.upload(screen.getByLabelText('Microsoft DHCP XML export'), file);
-
-    expect(screen.getByRole('heading', { name: 'Environment overview' })).toHaveFocus();
-    expect(screen.getAllByText('dhcp01.example.com').length).toBeGreaterThan(0);
-    expect(screen.getByText('1', { selector: '[data-workspace-metric="ipv4-scopes"]' })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Documentation LAN/ })).toBeVisible();
-    expect(screen.getByText(/reservation is inside a dynamic pool/i)).toBeVisible();
-
-    await user.type(screen.getByRole('searchbox', { name: 'Search environment' }), 'printer');
-    await user.click(screen.getByRole('button', { name: /printer\.example\.com/ }));
-    expect(screen.getByRole('heading', { name: 'Documentation LAN' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Stage reservation removal' })).toBeVisible();
-  });
-
-  it('renders a large Microsoft estate as scope rows instead of an object dump', async () => {
-    const user = userEvent.setup();
-    renderAt('#/tool/microsoft-workspace');
-    await user.upload(screen.getByLabelText('Microsoft DHCP XML export'), new File([largeMicrosoftXml], 'large.xml', { type: 'application/xml' }));
-
-    expect(screen.getByRole('heading', { name: 'Environment overview' })).toHaveFocus();
-    expect(screen.getAllByRole('button', { name: /Open .* VLAN 1\d\d/ })).toHaveLength(12);
-    expect(screen.getByText('331', { selector: '[data-workspace-metric="findings"]' })).toBeVisible();
-    expect(screen.queryByRole('heading', { name: 'Reservations 300' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /device-001/ })).not.toBeInTheDocument();
-
-    await user.type(screen.getByRole('searchbox', { name: 'Search environment' }), 'device-250');
-    await user.click(screen.getByRole('button', { name: /device-250\.lab\.example.*Training VLAN 109/ }));
-    expect(screen.getByRole('heading', { name: 'Training VLAN 109' })).toBeVisible();
-  });
-
-  it('loads only the active scope tab and groups repeated findings', async () => {
-    const user = userEvent.setup();
-    renderAt('#/tool/microsoft-workspace');
-    await user.upload(screen.getByLabelText('Microsoft DHCP XML export'), new File([largeMicrosoftXml], 'large.xml', { type: 'application/xml' }));
-    await user.click(screen.getByRole('button', { name: 'Open Office VLAN 100' }));
-
-    expect(screen.getByRole('heading', { name: 'Office VLAN 100' })).toHaveFocus();
-    expect(screen.queryByText('device-001.lab.example')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: /Reservations/ }));
-    expect(screen.getAllByRole('row').length).toBeLessThanOrEqual(51);
-    await user.click(screen.getByRole('tab', { name: /Findings/ }));
-    expect(screen.getByText('Reservation is inside a dynamic pool')).toBeVisible();
-    expect(screen.getByText('24')).toBeVisible();
-
-    await user.click(screen.getByRole('button', { name: '← All scopes' }));
-    expect(screen.getByRole('heading', { name: 'Environment overview' })).toHaveFocus();
-  });
-
-  it('rejects oversized workspace files before reading and cancels pending reads on Reset', async () => {
-    const user = userEvent.setup();
-    renderAt('#/tool/microsoft-workspace');
-    const input = screen.getByLabelText('Microsoft DHCP XML export');
+    renderAt();
+    const input = screen.getByLabelText('DHCP configuration file');
     const oversized = new File(['small'], 'oversized.xml');
     const oversizedText = vi.fn(async () => microsoftXml);
     Object.defineProperties(oversized, { size: { configurable: true, value: 2 * 1024 * 1024 + 1 }, text: { configurable: true, value: oversizedText } });
-
     await user.upload(input, oversized);
     expect(oversizedText).not.toHaveBeenCalled();
-    expect(input).toHaveAccessibleDescription('Files must be 2 MiB or smaller.');
+    expect(screen.getByRole('alert')).toHaveTextContent('The file exceeds 2 MiB.');
 
     const pending = deferred<string>();
     const delayed = new File(['ignored'], 'pending.xml');
     Object.defineProperty(delayed, 'text', { configurable: true, value: vi.fn(() => pending.promise) });
     fireEvent.change(input, { target: { files: [delayed] } });
-    await user.click(screen.getByRole('button', { name: 'Reset workspace' }));
+    await user.click(screen.getByRole('link', { name: 'Open utilities' }));
     await act(async () => pending.resolve(microsoftXml));
-
-    expect(screen.queryByRole('heading', { name: 'Environment overview' })).not.toBeInTheDocument();
-    expect(screen.queryByText('pending.xml')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'DHCP utilities' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'DHCP configuration review' })).not.toBeInTheDocument();
   });
 
-  it('localizes the Microsoft workspace and its imported review', async () => {
+  it.each([
+    ['microsoft.xml', microsoftXml, 'Microsoft DHCP'],
+    ['kea.json', kea, 'ISC Kea'],
+    ['dhcpd.conf', iscDhcpd, 'ISC dhcpd'],
+    ['dnsmasq.conf', dnsmasq, 'dnsmasq'],
+  ] as const)('opens %s directly into the shared workspace', async (fileName, content, vendor) => {
     const user = userEvent.setup();
-    renderAt('#/tool/microsoft-workspace');
-    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
-    expect(screen.getByRole('heading', { name: 'Microsoft-DHCP-Konfigurationsarbeitsbereich' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Synthetisches Beispiel öffnen' }));
-    expect(screen.getByRole('heading', { name: 'Umgebungsübersicht' })).toHaveFocus();
-    expect(screen.getByText(/Reservierung liegt in einem dynamischen Pool/)).toBeVisible();
+    renderAt();
+
+    await user.upload(screen.getByLabelText('DHCP configuration file'), new File([content], fileName));
+
+    expect(window.location.hash).toBe('#/workspace');
+    expect(screen.getByRole('heading', { name: 'DHCP configuration review' })).toHaveFocus();
+    expect(screen.getByText(vendor)).toBeVisible();
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toBeVisible();
+    expect(screen.getByRole('tab', { name: /Inventory/ })).toBeVisible();
   });
 
-  it('turns a selected scope change into a guarded PowerShell package', async () => {
+  it('opens with one explained workflow instead of competing analysis views', async () => {
+    const user = userEvent.setup();
+    renderAt();
+
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+
+    expect(screen.getByRole('heading', { name: 'DHCP configuration review' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('tab')).toHaveLength(5);
+    expect(screen.queryByRole('tab', { name: /^Analyze$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /^Findings/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your configuration is ready for review' })).toBeVisible();
+    expect(screen.getByText(/nothing is executed or sent anywhere/i)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Review 5 blockers' }));
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Act now' })).toBeVisible();
+  });
+
+  it('explains why export is unavailable and returns to the issue workflow', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+
+    expect(screen.getByRole('heading', { name: 'Prepare a change first' })).toBeVisible();
+    expect(screen.getByText(/export becomes available after you preview and add at least one change/i)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Generate guarded package' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Review changeable issues' }));
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveFocus();
+  });
+
+  it('opens a realistic example and explains a finding before offering a guarded change', async () => {
+    const user = userEvent.setup();
+    renderAt();
+
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    expect(screen.getByRole('heading', { name: 'DHCP configuration review' })).toHaveFocus();
+    expect(screen.getByText('Microsoft DHCP XML imported locally')).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    expect(within(context).getByText(/address conflict/i)).toBeVisible();
+    expect(within(context).getByText(/exclude this address/i)).toBeVisible();
+    expect(within(context).getByRole('button', { name: 'Preview change' })).toBeVisible();
+  });
+
+  it('moves from the explained overview into a prioritized issue queue', async () => {
+    const user = userEvent.setup();
+    renderAt();
+
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+
+    await user.click(screen.getByRole('button', { name: 'Review 5 blockers' }));
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Act now' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Observe' })).toBeVisible();
+    expect(screen.getAllByRole('button', { name: /^Review / }).length).toBeLessThanOrEqual(50);
+    expect(screen.queryByRole('region', { name: 'Review tray' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is outside its scope' }));
+    expect(screen.getByRole('heading', { name: 'Reservation is outside its scope' })).toHaveFocus();
+  });
+
+  it('keeps the context panel aligned with the visible filtered work', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Actionability' }), 'actionable');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Scope' }), screen.getByRole('option', { name: 'Office VLAN 100' }));
+
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    const row = screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' });
+    expect(within(row).getByText(/Office VLAN 100/)).toBeVisible();
+    expect(within(row).queryByText(/Warehouse VLAN/)).not.toBeInTheDocument();
+    expect(within(context).getByText('Reservation is inside a dynamic pool')).toBeVisible();
+    expect(within(context).getByText('Office VLAN 100')).toBeVisible();
+    expect(within(context).getByText('Occurrence 1 of 24')).toBeVisible();
+    expect(within(context).getByRole('button', { name: 'Preview change' })).toBeVisible();
+  });
+
+  it('keeps a finding in context while preparing and reviewing a change', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    expect(within(context).getByRole('heading', { name: 'Reservation is inside a dynamic pool' })).toHaveFocus();
+    expect(within(context).getByText('Why flagged')).toBeVisible();
+    expect(within(context).getByText('Operational impact')).toBeVisible();
+    expect(within(context).getByText(/Occurrence 1 of 298/)).toBeVisible();
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('region', { name: 'Review tray' })).not.toBeInTheDocument();
+    expect(within(context).getByText('Validated change preview')).toBeVisible();
+    expect(within(context).getByText('Warehouse VLAN 108 · 203.0.113.0/26')).toBeVisible();
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    expect(screen.getByRole('region', { name: 'Review tray' })).toHaveTextContent('1 prepared change');
+    expect(within(context).getByText('Validated change preview')).toBeVisible();
+    expect(within(context).getByText(/Before/)).toBeVisible();
+    expect(within(context).getByText(/After/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+    const changes = screen.getByRole('heading', { name: 'Prepared changes' }).closest('section')!;
+    expect(changes).toBeVisible();
+    expect(within(changes).getByText('Target scope')).toBeVisible();
+    expect(within(changes).getByText('Rationale')).toBeVisible();
+    expect(within(changes).getByText('No exclusion for this address')).toBeVisible();
+    expect(within(changes).getByText('203.0.113.13')).toBeVisible();
+    expect(within(changes).queryByText('{"start":"203.0.113.13","end":"203.0.113.13"}')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to issues' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Review export' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Review issue rationale' }));
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(screen.getByRole('complementary', { name: 'Finding context' })).getByText('Occurrence 1 of 25')).toBeVisible();
+  });
+
+  it('continues from a valid change plan into guarded export review', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+
+    await user.click(screen.getByRole('button', { name: 'Review export' }));
+
+    expect(screen.getByRole('tab', { name: 'Export' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Export' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Guarded change package' })).toBeVisible();
+  });
+
+  it('returns from each prepared operation to its exact finding occurrence', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Scope' }), screen.getByRole('option', { name: 'Office VLAN 100' }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    let context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(within(context).getByRole('button', { name: 'Next occurrence' }));
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+
+    await user.click(screen.getAllByRole('button', { name: 'Review issue rationale' })[0]!);
+    context = screen.getByRole('complementary', { name: 'Finding context' });
+    expect(within(context).getByText('Occurrence 1 of 24')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+    await user.click(screen.getAllByRole('button', { name: 'Review issue rationale' })[1]!);
+    expect(within(screen.getByRole('complementary', { name: 'Finding context' })).getByText('Occurrence 2 of 24')).toBeVisible();
+  });
+
+  it('localizes the operational queue and keeps non-Microsoft findings analysis-only', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.upload(screen.getByLabelText('DHCP configuration file'), new File([kea], 'kea.json'));
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    await user.click(screen.getByRole('tab', { name: /Probleme prüfen/ }));
+
+    expect(screen.getByRole('heading', { name: 'Jetzt handeln' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Prüfen' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Beobachten' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Arbeitsliste filtern' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Änderung vorbereiten' })).not.toBeInTheDocument();
+  });
+
+  it('shows exact target scopes and grouped risks before package acknowledgement', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+
+    expect(screen.getByRole('heading', { name: 'Target scope risk' })).toBeVisible();
+    expect(screen.getByText(/Reservation is inside a dynamic pool \(25\)/)).toBeVisible();
+    expect(screen.getByText(/Scope 203\.0\.113\.0\/26 · Warehouse VLAN 108/)).toBeVisible();
+  });
+
+  it('keeps specialist utilities reachable on a subordinate route', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    expect(screen.queryByRole('link', { name: /PXE boot/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Open utilities' }));
+
+    expect(window.location.hash).toBe('#/utilities');
+    expect(screen.getByRole('heading', { name: 'DHCP utilities' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: /PXE boot/ })).toBeVisible();
+  });
+
+  it('turns an evidenced finding into a downloadable guarded Microsoft package', async () => {
     const user = userEvent.setup();
     const downloads = captureDownloads();
-    renderAt('#/tool/microsoft-workspace');
-    await user.click(screen.getByRole('button', { name: 'Open synthetic example' }));
-    await user.click(screen.getByRole('button', { name: /Documentation LAN/ }));
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
 
-    await user.clear(screen.getByRole('spinbutton', { name: 'Lease duration in hours' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Lease duration in hours' }), '24');
-    await user.click(screen.getByRole('button', { name: 'Stage lease change' }));
-
-    expect(screen.getByRole('heading', { name: 'Change Set' })).toBeVisible();
-    expect(screen.getByText(/8 hours.*24 hours/i)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Prepared changes' })).toBeVisible();
+    expect(screen.getAllByText(/Validation passed/).some((item) => item.classList.contains('validation-ok'))).toBe(true);
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+    const acknowledgement = screen.queryByRole('checkbox', { name: /reviewed the target warnings/ });
+    if (acknowledgement) await user.click(acknowledgement);
     await user.click(screen.getByRole('button', { name: 'Generate guarded package' }));
-    expect(await screen.findByRole('heading', { name: 'Generated package' })).toBeVisible();
+    const applyDownload = screen.getByRole('link', { name: 'Download 02-Apply.ps1' });
+    expect(applyDownload).toHaveAttribute('download', '02-Apply.ps1');
+    expect(applyDownload).toHaveAttribute('href', 'blob:download-2');
+    expect(await readBlob(downloads.blobs[1]!)).toContain('Add-DhcpServerv4ExclusionRange');
+    applyDownload.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    await user.click(applyDownload);
+    expect(screen.getByRole('status')).toHaveTextContent('Download requested: 02-Apply.ps1');
 
-    await user.click(screen.getByRole('button', { name: 'Download 02-Apply.ps1' }));
-    expect(downloads.items.at(-1)?.filename).toBe('02-Apply.ps1');
-    expect(await downloads.items.at(-1)?.blob.text()).toContain('Set-DhcpServerv4Scope');
-    expect(URL.revokeObjectURL).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Open another configuration' }));
+    expect(downloads.revokeObjectUrl).toHaveBeenCalledTimes(7);
   });
 
-  it('offers object-specific changes instead of a generic questionnaire', async () => {
+  it('ignores package generation that finishes after leaving the export view', async () => {
     const user = userEvent.setup();
-    renderAt('#/tool/microsoft-workspace');
-    await user.click(screen.getByRole('button', { name: 'Open synthetic example' }));
+    const digest = deferred<ArrayBuffer>();
+    vi.stubGlobal('crypto', { subtle: { digest: vi.fn(() => digest.promise) } });
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+    await user.click(screen.getByRole('checkbox', { name: 'I reviewed the target warnings.' }));
+    await user.click(screen.getByRole('button', { name: 'Generate guarded package' }));
+    expect(screen.getByRole('button', { name: 'Generating package…' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: /Documentation LAN/ }));
-    await user.click(screen.getByRole('button', { name: '192.0.2.30 – 192.0.2.39' }));
-    expect(screen.getByRole('button', { name: 'Stage exclusion removal' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Stage exclusion removal' }));
-    expect(screen.getByText('exclusion.remove')).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: /Change plan/ }));
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+    await act(async () => digest.resolve(new Uint8Array(32).buffer));
 
-    await user.click(screen.getByRole('tab', { name: /Reservations/ }));
-    await user.click(screen.getByRole('button', { name: 'Select' }));
-    expect(screen.getByRole('button', { name: 'Stage reservation removal' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Package ready' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
+  });
+
+  it('surfaces package generation failures without exposing partial files', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('crypto', { subtle: { digest: vi.fn(async () => { throw new Error('digest failed'); }) } });
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+    await user.click(screen.getByRole('checkbox', { name: 'I reviewed the target warnings.' }));
+    await user.click(screen.getByRole('button', { name: 'Generate guarded package' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Package generation failed. No files were created.');
+    expect(screen.getByRole('button', { name: 'Generate guarded package' })).toBeEnabled();
+    expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps non-Microsoft analysis useful without exposing executable controls', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.upload(screen.getByLabelText('DHCP configuration file'), new File([kea], 'kea.json'));
+    await user.click(screen.getByRole('tab', { name: /Change plan/ }));
+    expect(screen.getByText(/Microsoft DHCP XML export is required/)).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+    expect(screen.queryByRole('button', { name: 'Generate guarded package' })).not.toBeInTheDocument();
+  });
+
+  it('provides complete keyboard tabs and severity filtering in the shared workspace', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.upload(screen.getByLabelText('DHCP configuration file'), new File([microsoftXml], 'microsoft.xml'));
+    const overview = screen.getByRole('tab', { name: 'Overview' });
+    overview.focus();
+    await user.keyboard('{ArrowRight}');
+    const issues = screen.getByRole('tab', { name: /Review issues/ });
+    expect(issues).toHaveFocus();
+    expect(issues).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', issues.id);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Severity' }), 'warning');
+    expect(screen.queryByRole('heading', { name: 'Act now' })).toBeVisible();
+    expect(screen.queryByText('Blocker', { selector: '.remediation-severity' })).not.toBeInTheDocument();
+  });
+
+  it('shows import coverage separately from assessment and package readiness', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.upload(screen.getByLabelText('DHCP configuration file'), new File([kea], 'kea.json'));
+    expect(screen.getByRole('heading', { name: 'Import coverage' })).toBeVisible();
+    expect(screen.getByText(/bounded parser/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Assessment' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Open prioritized issues' }));
+    expect(screen.getByRole('tab', { name: /Review issues/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('keeps a large estate bounded in the paginated issue queue', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+
+    expect(screen.getAllByRole('button', { name: /^Review / }).length).toBeLessThanOrEqual(50);
+    expect(screen.getByText('331 issues sorted by urgency')).toBeVisible();
+    expect(screen.getAllByText(/Occurrence 1 of/).length).toBeLessThanOrEqual(1);
+  });
+
+  it('explains a direct workspace link when its local session is unavailable', () => {
+    renderAt('#/workspace');
+    expect(screen.getByRole('status')).toHaveTextContent('This workspace session is no longer available');
+  });
+
+  it('keeps large object inventories search-first and bounded', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Inventory/ }));
+    expect(screen.queryByRole('button', { name: /device-250/ })).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search configuration objects' }), 'device-250');
+    expect(screen.getByRole('button', { name: /device-250/ })).toBeVisible();
+  });
+
+  it('uses inventory category cards as bounded object filters', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Inventory/ }));
+
+    const reservations = screen.getByRole('button', { name: 'Show Reservation objects (300)' });
+    await user.click(reservations);
+
+    expect(reservations).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('100+ results')).toBeVisible();
+    expect(screen.getByRole('button', { name: /device-001\.lab\.example/ })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'device-001.lab.example' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'device-001.lab.example' })).toHaveFocus();
+    expect(screen.queryByRole('button', { name: /Office VLAN 100/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show all object types (410)' }));
+    expect(screen.getByRole('heading', { name: 'Object inventory' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Select an object' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /device-001\.lab\.example/ })).not.toBeInTheDocument();
+  });
+
+  it('localizes the complete shared finding explanation in German', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.upload(screen.getByLabelText('DHCP configuration file'), new File([microsoftXml], 'microsoft.xml'));
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    await user.click(screen.getByRole('tab', { name: /Probleme prüfen/ }));
+    await user.click(screen.getByRole('button', { name: 'Prüfen Reservierung liegt in einem dynamischen Pool' }));
+    const context = screen.getByRole('complementary', { name: 'Befundkontext' });
+    expect(within(context).getByText('Betriebliche Auswirkung')).toBeVisible();
+    expect(within(context).getByText(/Adresskonflikt/)).toBeVisible();
+    expect(within(context).getByText(/Adresse.*dynamischen Pool ausschließen/i)).toBeVisible();
+    expect(within(context).getByText('Pool-Start')).toBeVisible();
+    expect(within(context).queryByText('poolStart')).not.toBeInTheDocument();
+  });
+
+  it('keeps workspace operations and package eligibility understandable in German', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    expect(screen.getByText(/IPv4-Scopes.*Pools.*Ausschlüsse/)).toBeVisible();
+    expect(screen.queryByText(/IPv4 scopes.*pools.*exclusions/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /Probleme prüfen/ }));
+    await user.click(screen.getByRole('button', { name: 'Prüfen Reservierung liegt in einem dynamischen Pool' }));
+    const context = screen.getByRole('complementary', { name: 'Befundkontext' });
+    await user.click(within(context).getByRole('button', { name: 'Änderung prüfen' }));
+    await user.click(within(context).getByRole('button', { name: 'Zur Prüfung hinzufügen' }));
+    await user.click(screen.getByRole('button', { name: 'Änderungen prüfen' }));
+    expect(screen.getAllByText('Ausschluss hinzufügen').length).toBeGreaterThan(0);
+    expect(screen.queryByText('exclusion.add')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+    expect(screen.queryByText(/target-warning-findings/)).not.toBeInTheDocument();
+    for (const artifact of ['01-Preflight.ps1', '02-Apply.ps1', '03-Verify.ps1', '04-Rollback.ps1', 'CHANGE.md', 'change-set.json', 'manifest.json']) {
+      expect(screen.getByText(artifact, { selector: '.workspace-artifact-plan code' })).toBeVisible();
+    }
+  });
+
+  it('renders all stable tool links, their groups, and a live tool count', () => {
+    renderAt('#/utilities');
+
+    expect(screen.getByRole('heading', { name: 'DHCP utilities' })).toBeVisible();
+    expect(screen.getByText('9 tools ready')).toBeVisible();
+    for (const group of ['Plan', 'Build', 'Analyze', 'Troubleshoot', 'Secure']) {
+      expect(screen.getByRole('heading', { name: group })).toBeVisible();
+    }
+    for (const name of toolNames.filter((name) => !['Microsoft DHCP Config Workspace', 'Configuration analyzer'].includes(name))) {
+      expect(screen.getByRole('link', { name: new RegExp(name) })).toHaveAttribute('href', expect.stringContaining('#/tool/'));
+    }
   });
 
   it('keeps narrow-page overflow out of the document while category scrolling stays local', async () => {
@@ -184,11 +514,12 @@ describe('DHCPulse Workbench', () => {
 
     expect(resetCss).not.toMatch(/body\s*\{[^}]*min-width\s*:\s*320px/i);
     expect(appCss).toMatch(/\.category-tabs\s*\{[^}]*overflow-x\s*:\s*auto/i);
+    expect(appCss).toMatch(/\.config-file-button:focus-within\s*\{[^}]*outline/i);
   });
 
   it('searches translated tool content and clears an empty result', async () => {
     const user = userEvent.setup();
-    renderAt();
+    renderAt('#/utilities');
     const search = screen.getByRole('searchbox', { name: 'Search tools' });
 
     await user.type(search, 'pxe');
@@ -205,12 +536,12 @@ describe('DHCPulse Workbench', () => {
     await user.type(germanSearch, 'kein solches werkzeug');
     expect(screen.getByText('Keine passenden Tools gefunden.')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Suche löschen' }));
-    expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('#/tool/'))).toHaveLength(11);
+    expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('#/tool/'))).toHaveLength(9);
   });
 
   it('navigates through valid tool hashes without reloading', async () => {
     const user = userEvent.setup();
-    renderAt();
+    renderAt('#/utilities');
 
     await user.click(screen.getByRole('link', { name: /Scope and capacity/ }));
     expect(window.location.hash).toBe('#/tool/scope');
@@ -225,7 +556,7 @@ describe('DHCPulse Workbench', () => {
 
   it('moves keyboard focus to the route heading without stealing it on a locale-only change', async () => {
     const user = userEvent.setup();
-    renderAt();
+    renderAt('#/utilities');
     const scopeLink = screen.getByRole('link', { name: /Scope and capacity/ });
 
     scopeLink.focus();
@@ -244,7 +575,7 @@ describe('DHCPulse Workbench', () => {
   });
 
   it('moves focus to the not-found heading after an invalid hash route', () => {
-    renderAt();
+    renderAt('#/utilities');
     screen.getByRole('searchbox', { name: 'Search tools' }).focus();
 
     window.location.hash = '#/tool/unknown';
@@ -261,7 +592,7 @@ describe('DHCPulse Workbench', () => {
 
     expect(screen.getByRole('heading', { name: 'Tool not found' })).toBeVisible();
     await user.click(screen.getByRole('link', { name: 'Back to all tools' }));
-    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'DHCP utilities' })).toBeVisible();
   });
 
   it('returns keyboard focus to the catalog heading from both Back links', async () => {
@@ -272,7 +603,7 @@ describe('DHCPulse Workbench', () => {
     toolBack.focus();
     await user.keyboard('{Enter}');
 
-    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'DHCP utilities' })).toHaveFocus();
 
     window.location.hash = '#/tool/unknown';
     fireEvent(window, new HashChangeEvent('hashchange'));
@@ -280,34 +611,34 @@ describe('DHCPulse Workbench', () => {
     notFoundBack.focus();
     await user.keyboard('{Enter}');
 
-    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'DHCP utilities' })).toHaveFocus();
   });
 
-  it('focuses the catalog heading only when a hash route returns from a tool', async () => {
+  it('keeps route focus stable across locale changes and tool returns', async () => {
     const user = userEvent.setup();
-    renderAt();
-    const initialHeading = screen.getByRole('heading', { name: 'DHCPulse Workbench' });
+    renderAt('#/utilities');
+    const initialHeading = screen.getByRole('heading', { name: 'DHCP utilities' });
 
     expect(initialHeading).toHaveAttribute('tabindex', '-1');
-    expect(initialHeading).not.toHaveFocus();
+    expect(initialHeading).toHaveFocus();
 
     const germanButton = screen.getByRole('button', { name: 'Deutsch' });
     germanButton.focus();
     await user.keyboard('{Enter}');
     expect(germanButton).toHaveFocus();
-    expect(initialHeading).not.toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'DHCP-Werkzeuge' })).not.toHaveFocus();
 
     window.location.hash = '#/tool/scope';
     fireEvent(window, new HashChangeEvent('hashchange'));
     expect(screen.getByRole('heading', { name: 'Bereich und Kapazität' })).toHaveFocus();
 
-    window.location.hash = '#/';
+    window.location.hash = '#/utilities';
     fireEvent(window, new HashChangeEvent('hashchange'));
-    expect(screen.getByRole('heading', { name: 'DHCPulse Workbench' })).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'DHCP-Werkzeuge' })).toHaveFocus();
   });
 
   it('moves category selection and focus with wrapping keyboard controls', () => {
-    renderAt();
+    renderAt('#/utilities');
     expect(screen.getByRole('toolbar', { name: 'Tool categories' })).toBeVisible();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     const all = screen.getByRole('button', { name: 'All tools' });
@@ -415,10 +746,11 @@ describe('DHCPulse Workbench', () => {
   });
 
   it('renders a named, non-empty panel for every stable route', () => {
-    const ids = ['microsoft-workspace', 'scope', 'lease', 'options', 'pxe', 'failover', 'dhcpv6', 'diagnostics', 'security', 'config-analyzer', 'config-diff'];
-    const view = renderAt('#/tool/microsoft-workspace');
+    const ids = ['scope', 'lease', 'options', 'pxe', 'failover', 'dhcpv6', 'diagnostics', 'security', 'config-analyzer', 'config-diff'];
+    const names = toolNames.filter((name) => name !== 'Microsoft DHCP Config Workspace');
+    const view = renderAt('#/tool/scope');
 
-    toolNames.forEach((name, index) => {
+    names.forEach((name, index) => {
       const id = ids[index];
       if (index > 0) {
         window.location.hash = `#/tool/${id}`;
@@ -429,6 +761,12 @@ describe('DHCPulse Workbench', () => {
     });
 
     view.unmount();
+  });
+
+  it('redirects the retired Microsoft utility route to the unified import entry', () => {
+    renderAt('#/tool/microsoft-workspace');
+    expect(screen.getByRole('heading', { name: 'Understand and improve your DHCP configuration' })).toBeVisible();
+    expect(screen.queryByText('Open a Microsoft DHCP export')).not.toBeInTheDocument();
   });
 
   it('states browser-local processing and no uploads in both languages', async () => {
@@ -511,6 +849,17 @@ describe('DHCPulse Workbench', () => {
     await user.clear(secondValue);
     await user.type(secondValue, '80000');
     expect(screen.getAllByText('T1 must be less than T2.').length).toBeGreaterThan(0);
+  });
+
+  it('keeps cleared numeric option fields controlled without React warnings', async () => {
+    const user = userEvent.setup();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    renderAt('#/tool/options');
+
+    await user.clear(screen.getByRole('spinbutton', { name: 'Option 2 code' }));
+
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('Received NaN for the `value` attribute');
+    consoleError.mockRestore();
   });
 
   it('derives PXE architecture results from visible selections before warning about a mixed global file', async () => {
@@ -925,13 +1274,14 @@ describe('DHCPulse Workbench', () => {
 
   it('localizes Header landmark labels and polished German catalog copy', async () => {
     const user = userEvent.setup();
-    renderAt();
+    renderAt('#/utilities');
 
     await user.click(screen.getByRole('button', { name: 'Deutsch' }));
 
     expect(screen.getByRole('link', { name: 'DHCPulse Startseite' })).toBeVisible();
     expect(screen.getByRole('navigation', { name: 'Hauptnavigation' })).toBeVisible();
-    expect(screen.getByRole('link', { name: /Konfigurationsanalyse/ })).toHaveTextContent('DHCP-Konfiguration auf typische Risiken prüfen.');
+    expect(screen.getByRole('heading', { name: 'DHCP-Werkzeuge' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /Konfigurationsvergleich/ })).toHaveTextContent('DHCP-Konfigurationen vor einer Änderung vergleichen.');
   });
 });
 
@@ -957,5 +1307,5 @@ function captureDownloads() {
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function captureDownload(this: HTMLAnchorElement) {
     items.push({ blob: blobs[items.length]!, filename: this.download });
   });
-  return { items, createObjectUrl, revokeObjectUrl };
+  return { blobs, items, createObjectUrl, revokeObjectUrl };
 }

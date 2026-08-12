@@ -1,14 +1,24 @@
 # DHCPulse
 
-DHCPulse is a static, local-only DHCP workbench for planning address pools and lease changes, preparing options and PXE settings, reviewing failover and DHCPv6 designs, troubleshooting symptoms, checking security controls, and comparing vendor configurations before a change window.
+DHCPulse is a static, local-only configuration workspace for understanding DHCP environments and preparing safer changes. Open a Microsoft DHCP XML, Kea JSON, ISC `dhcpd.conf`, or dnsmasq configuration to get one normalized overview, prioritized findings, and a searchable object inventory. Supported Microsoft findings can be turned into validated Preflight, Apply, Verify, and Rollback PowerShell artifacts.
 
 It is useful when you need an explainable second opinion without sending production configuration to an application backend. DHCPulse is not a DHCP server, IPAM/DDI system, live monitor, active scanner, packet generator, or substitute for vendor validation and lab testing.
 
-## Implemented tools
+## Primary workflow
+
+1. Open a local configuration or the bundled realistic Microsoft example.
+2. Start on **Overview**, which explains the import result, the product boundary, and the four-step review flow.
+3. Open **Review issues** and work through **Act now**, **Review**, and **Observe**. Filter by scope, severity, actionability, or rule, then inspect evidence, provenance, related objects, and repeated occurrences.
+4. For supported Microsoft XML issues, preview an allow-listed typed change before adding it to the local **Change plan**. Adding the same issue twice remains idempotent.
+5. Review exact scope, rationale, before/after state, and validation before opening **Export**. The export view explains missing prerequisites instead of presenting an inactive action.
+6. Generate, download, and inspect the guarded package. DHCPulse never connects to or changes the server.
+
+Kea, ISC dhcpd, and dnsmasq receive the same analysis and object workflow. Executable changes remain Microsoft-only because their package generation is bound to the typed Microsoft DHCP PowerShell model and validated source facts.
+
+## Specialist utilities
 
 | Tool | Practical use |
 | --- | --- |
-| Microsoft DHCP Config Workspace | Open an `Export-DhcpServer` XML file as a scope-first estate, search across owned objects, review grouped findings in paginated scope details, stage validated object-specific changes, and generate guarded Preflight, Apply, Verify, and Rollback PowerShell artifacts. |
 | Scope and capacity | Design IPv4 pools, exclusions, reservations, and capacity margins. |
 | Lease transition | Model T1, T2, expiry, client waves, cutover risks, and rollback steps. |
 | DHCP options | Find, encode, decode, and validate common DHCPv4 and DHCPv6 options. |
@@ -17,18 +27,17 @@ It is useful when you need an explainable second opinion without sending product
 | DHCPv6 | Review RA flags, address and prefix lifetimes, relay evidence, DUID/IAID assumptions, and delegated-prefix capacity. |
 | Diagnostics | Rank likely causes from entered symptoms and evidence, then provide targeted checks and sources. |
 | DHCP security | Review control evidence for infrastructure, service, network, and operational safeguards. |
-| Configuration analyzer | Import a supported configuration locally and summarize scopes, pools, reservations, options, parser warnings, and selected migration or security observations. |
 | Configuration comparison | Normalize two supported configurations and report redacted semantic additions, removals, changes, and migration impacts. |
 
 All tools run in the browser. Reports are assembled locally and downloaded through a temporary object URL. Imported-configuration reports are redacted by default.
 
-The Microsoft workspace is deliberately different from the standalone planners: it starts with the administrator's existing configuration and presents a compact scope table instead of dumping every imported object. Search results retain their owning-scope context; reservations, options, and findings load only in the active scope tab, with at most 50 list rows per page. Import coverage, assessment findings, and target-specific package eligibility are shown separately. Generated change packages contain real infrastructure values, execute nothing automatically, and must be reviewed and tested before use. The package includes a human-readable change record, the immutable change set, and a SHA-256 manifest alongside the four PowerShell phases.
+The configuration workspace does not dump a large environment into the page. Its overview explains what was imported and directs the operator into one progressive flow: **Overview → Review issues → Inventory → Change plan → Export**. The issue queue groups findings by rule, ranks operational work, keeps occurrence and scope context visible, and limits every section to 50 rule groups. Repeated occurrences remain navigable, while objects load through a bounded search. Import coverage, expert analysis, and package readiness remain separate. Before acknowledgement, package readiness lists exact target scopes and grouped blocker and warning rules. Generated change packages contain real infrastructure values, execute nothing automatically, and must be reviewed and tested before use. The package includes a human-readable change record, the immutable change set, and a SHA-256 manifest alongside the four PowerShell phases.
 
 A large, entirely synthetic Microsoft export is available in [`samples/`](samples/) for regression and upload testing.
 
 ## Configuration imports
 
-The Microsoft workspace, analyzer, and comparison tools accept pasted text or local files in these formats:
+The primary workspace accepts local files in these formats; the comparison utility also accepts pasted text:
 
 - Microsoft DHCP Server XML exports
 - Kea JSON, including the supported comment forms
@@ -41,7 +50,7 @@ The adapters intentionally parse a bounded analysis subset. Unsupported elements
 
 Configuration files can contain sensitive infrastructure data, including addresses, hostnames, client identifiers, topology labels, audit paths, and embedded option values. Local processing prevents application uploads, but it does not make that data non-sensitive. Use a trusted browser and host, keep downloaded reports under appropriate access control, and inspect redaction before sharing.
 
-Use **Reset** to restore the current tool's synthetic defaults and clear its current in-memory state. Leaving a tool or reloading or closing the tab also discards application state. DHCPulse does not persist projects or imports.
+Use **Open another configuration** to discard the active workspace. Leaving a utility resets its isolated state; reloading or closing the tab discards all application state. DHCPulse does not persist projects or imports.
 
 ## Privacy and security boundary
 
