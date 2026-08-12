@@ -1,9 +1,6 @@
-name: dhcpulse
-
 services:
   dhcpulse:
-    image: "${DHCPULSE_IMAGE:-ghcr.io/bifrost0x/dhcpulse:latest}"
-    pull_policy: always
+    image: ghcr.io/bifrost0x/dhcpulse:latest
     restart: unless-stopped
     ports:
       - "${DHCPULSE_PORT:-8080}:8080"

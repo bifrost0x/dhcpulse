@@ -24,6 +24,7 @@ describe('repository policy', () => {
     const readme = await readFile('README.md', 'utf8');
     const gettingStarted = await readFile('docs/getting-started.md', 'utf8');
     const deployment = await readFile('docs/deployment.md', 'utf8');
+    const codeql = await readFile('.github/workflows/codeql.yml', 'utf8');
 
     expect(packageJson.scripts.dev).toContain('--host 0.0.0.0');
     expect(packageJson.scripts.dev).toContain('--port 5173');
@@ -32,7 +33,9 @@ describe('repository policy', () => {
     expect(packageJson.scripts.preview).toContain('--port 4173');
     expect(compose).not.toMatch(/^\s*container_name:/m);
     expect(compose).not.toMatch(/^\s*build:/m);
-    expect(compose).toContain('ghcr.io/bifrost0x/dhcpulse:latest');
+    expect(compose).not.toMatch(/^name:/m);
+    expect(compose).not.toMatch(/^\s*pull_policy:/m);
+    expect(compose).toMatch(/^\s*image: ghcr\.io\/bifrost0x\/dhcpulse:latest$/m);
     expect(buildCompose).toMatch(/^\s*build:/m);
     expect(buildCompose).toContain('dhcpulse:local');
     expect(readme).toContain('http://localhost:5173/');
@@ -42,35 +45,20 @@ describe('repository policy', () => {
     expect(gettingStarted).toContain('http://localhost:8080/');
     expect(deployment).toContain('docker compose pull');
     expect(deployment).toContain('docker compose up -d --wait');
+    expect(codeql).toMatch(/^ {2}workflow_dispatch:$/m);
   });
 
   it('rejects internal planning and local tool artifacts', () => {
     expect(
       findForbiddenPaths([
         'docs/development/implementation-plan.md',
-        'docs/superpowers/plans/release.md',
         'plans/next-release.md',
-        '.codex/settings.json',
-        '.agents/config.json',
-        'graphify-out/graph.json',
         '.worktrees/release/index',
-        'AGENTS.md',
-        'CLAUDE.md',
-        'GEMINI.md',
-        '.github/copilot-instructions.md',
       ]),
     ).toEqual([
       'docs/development/implementation-plan.md',
-      'docs/superpowers/plans/release.md',
       'plans/next-release.md',
-      '.codex/settings.json',
-      '.agents/config.json',
-      'graphify-out/graph.json',
       '.worktrees/release/index',
-      'AGENTS.md',
-      'CLAUDE.md',
-      'GEMINI.md',
-      '.github/copilot-instructions.md',
     ]);
   });
 

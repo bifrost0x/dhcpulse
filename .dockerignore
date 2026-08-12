@@ -5,9 +5,6 @@ release
 .git
 .github
 docs
-.codex
-.agents
-graphify-out
 .worktrees
 worktrees
 .vscode
@@ -22,7 +19,4 @@ secrets
 *.pem
 *.p12
 *.pfx
-AGENTS.md
-CLAUDE.md
-GEMINI.md
 *.log
