@@ -5,19 +5,26 @@ DHCPulse is a static single-page application. It requires no application server,
 ## Container deployment
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d --wait
 docker compose ps
 ```
 
-The included Compose service publishes container port 8080, runs as UID/GID 101, drops all Linux capabilities, uses `no-new-privileges`, mounts only bounded temporary filesystems as writable, and keeps the root filesystem read-only.
+The included Compose service pulls `ghcr.io/bifrost0x/dhcpulse:latest`, publishes container port 8080, runs as UID/GID 101, drops all Linux capabilities, uses `no-new-privileges`, mounts only bounded temporary filesystems as writable, and keeps the root filesystem read-only. Set `DHCPULSE_IMAGE` to a versioned image tag or immutable digest for controlled deployments.
 
 To use another host port:
 
 ```bash
-DHCPULSE_PORT=18080 docker compose up -d --build
+DHCPULSE_PORT=18080 docker compose up -d --wait
 ```
 
 The health check requests `http://127.0.0.1:8080/` inside the container.
+
+To build the checked-out source intentionally, use the isolated developer override instead of the public deployment path:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build --wait
+```
 
 ## Static hosting
 

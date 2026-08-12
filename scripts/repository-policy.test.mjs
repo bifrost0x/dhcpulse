@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
 
 import {
   findForbiddenPaths,
@@ -8,6 +9,41 @@ import {
 } from './repository-policy.mjs';
 
 describe('repository policy', () => {
+  it('validates release artifacts before publishing architecture images', async () => {
+    const workflow = await readFile('.github/workflows/release.yml', 'utf8');
+    const containerJob = workflow.match(/\n {2}container:\n([\s\S]*?)\n {2}publish:\n/)?.[1];
+
+    expect(containerJob).toBeDefined();
+    expect(containerJob).toMatch(/^ {4}needs: static-artifacts$/m);
+  });
+
+  it('provides deterministic npm and collision-safe Compose startup paths', async () => {
+    const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
+    const compose = await readFile('compose.yaml', 'utf8');
+    const buildCompose = await readFile('compose.build.yaml', 'utf8').catch(() => '');
+    const readme = await readFile('README.md', 'utf8');
+    const gettingStarted = await readFile('docs/getting-started.md', 'utf8');
+    const deployment = await readFile('docs/deployment.md', 'utf8');
+
+    expect(packageJson.scripts.dev).toContain('--host 0.0.0.0');
+    expect(packageJson.scripts.dev).toContain('--port 5173');
+    expect(packageJson.scripts.start).toBe('npm run build && npm run preview');
+    expect(packageJson.scripts.preview).toContain('--host 0.0.0.0');
+    expect(packageJson.scripts.preview).toContain('--port 4173');
+    expect(compose).not.toMatch(/^\s*container_name:/m);
+    expect(compose).not.toMatch(/^\s*build:/m);
+    expect(compose).toContain('ghcr.io/bifrost0x/dhcpulse:latest');
+    expect(buildCompose).toMatch(/^\s*build:/m);
+    expect(buildCompose).toContain('dhcpulse:local');
+    expect(readme).toContain('http://localhost:5173/');
+    expect(readme).toContain('http://localhost:8080/');
+    expect(gettingStarted).toContain('http://localhost:5173/');
+    expect(gettingStarted).toContain('http://localhost:4173/');
+    expect(gettingStarted).toContain('http://localhost:8080/');
+    expect(deployment).toContain('docker compose pull');
+    expect(deployment).toContain('docker compose up -d --wait');
+  });
+
   it('rejects internal planning and local tool artifacts', () => {
     expect(
       findForbiddenPaths([

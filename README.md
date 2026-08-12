@@ -24,7 +24,7 @@ DHCPulse does not run scripts, connect to DHCP servers, scan networks, provide D
 
 ## Start in two minutes
 
-Requirements: Node.js matching the supported engine range in `package.json` (22.22.2+, 24.15.0+, or 26+).
+Requirements: Node.js matching the supported engine range in `package.json` (22.22.2+, 24.15.0+, or 26+). Node.js 26 is the recommended path and matches the container and primary CI environment.
 
 ```bash
 git clone https://github.com/bifrost0x/dhcpulse.git
@@ -33,7 +33,9 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite, select **Open a configuration**, and use either your export or the fully synthetic sample in [`samples/`](samples/).
+Open **http://localhost:5173/**, select **Open a configuration**, and use either your export or the fully synthetic sample in [`samples/`](samples/). Vite also prints a network URL for testing from another device on the same trusted network. If port 5173 is occupied, use the fallback URL printed by Vite.
+
+For a production-like local npm preview, run `npm start` and open **http://localhost:4173/**. This builds the application before serving it; Docker remains the recommended deployment path.
 
 The main workflow is:
 
@@ -65,10 +67,13 @@ Configuration exports and generated packages remain sensitive operational data. 
 ## Docker
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d --wait
 ```
 
-The container listens on port 8080 and runs as an unprivileged user with a read-only root filesystem, dropped capabilities, `no-new-privileges`, bounded temporary filesystems, a health check, and restrictive response headers. Set `DHCPULSE_PORT` to publish another host port.
+Open **http://localhost:8080/** after Compose reports that the service is healthy. This path pulls the official `ghcr.io/bifrost0x/dhcpulse:latest` image; it does not build source code locally. The container listens on port 8080 and runs as an unprivileged user with a read-only root filesystem, dropped capabilities, `no-new-privileges`, bounded temporary filesystems, a health check, and restrictive response headers. Set `DHCPULSE_PORT` to publish another host port, for example `DHCPULSE_PORT=9080 docker compose up -d --wait`.
+
+Maintainers who intentionally need a local source build can opt in with `docker compose -f compose.yaml -f compose.build.yaml up -d --build --wait`.
 
 Deployment and reverse-proxy requirements are documented in [Deployment](docs/deployment.md).
 

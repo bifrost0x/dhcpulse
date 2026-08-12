@@ -1,0 +1,6 @@
+services:
+  dhcpulse:
+    build:
+      context: .
+    image: dhcpulse:local
+    pull_policy: build

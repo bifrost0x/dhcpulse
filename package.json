@@ -26,9 +26,10 @@
   "scripts": {
     "audit:dependencies": "npm audit --audit-level=low",
     "check:repo": "node scripts/verify-repository.mjs",
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 5173 --clearScreen false",
+    "start": "npm run build && npm run preview",
     "build": "tsc -b && vite build && node scripts/verify-build.mjs",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port 4173 --clearScreen false",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
     "test:coverage": "vitest run --coverage",
