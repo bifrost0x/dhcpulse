@@ -20,7 +20,8 @@ env:
   TRIVY_SHA256: 2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b
 
 jobs:
-  scan:
+  container-security:
+    name: Container security
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

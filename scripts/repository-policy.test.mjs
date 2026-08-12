@@ -17,6 +17,16 @@ describe('repository policy', () => {
     expect(containerJob).toMatch(/^ {4}needs: static-artifacts$/m);
   });
 
+  it('publishes unique security check names for branch rules', async () => {
+    const secretScan = await readFile('.github/workflows/secret-scan.yml', 'utf8');
+    const containerSecurity = await readFile('.github/workflows/container-security.yml', 'utf8');
+
+    expect(secretScan).toMatch(/^ {2}secret-scan:$/m);
+    expect(containerSecurity).toMatch(/^ {2}container-security:$/m);
+    expect(secretScan).not.toMatch(/^ {2}scan:$/m);
+    expect(containerSecurity).not.toMatch(/^ {2}scan:$/m);
+  });
+
   it('provides deterministic npm and collision-safe Compose startup paths', async () => {
     const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
     const compose = await readFile('compose.yaml', 'utf8');
