@@ -20,11 +20,14 @@ describe('repository policy', () => {
   it('publishes unique security check names for branch rules', async () => {
     const secretScan = await readFile('.github/workflows/secret-scan.yml', 'utf8');
     const containerSecurity = await readFile('.github/workflows/container-security.yml', 'utf8');
+    const dependencyReview = await readFile('.github/workflows/dependency-review.yml', 'utf8');
 
     expect(secretScan).toMatch(/^ {2}secret-scan:$/m);
     expect(containerSecurity).toMatch(/^ {2}container-security:$/m);
+    expect(dependencyReview).toMatch(/^ {2}dependency-review:$/m);
     expect(secretScan).not.toMatch(/^ {2}scan:$/m);
     expect(containerSecurity).not.toMatch(/^ {2}scan:$/m);
+    expect(dependencyReview).not.toMatch(/^ {2}review:$/m);
   });
 
   it('provides deterministic npm and collision-safe Compose startup paths', async () => {
