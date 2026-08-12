@@ -76,6 +76,7 @@ jobs:
 
   container:
     name: Container (${{ matrix.arch }})
+    needs: static-artifacts
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:

@@ -4,20 +4,46 @@ This guide takes an administrator from a supported configuration export to a rev
 
 ## 1. Open DHCPulse
 
-Use a trusted deployment or start a local development instance:
+Use one of the following startup paths.
+
+### npm development server
 
 ```bash
 npm ci
 npm run dev
 ```
 
-For a production-like local instance:
+Open `http://localhost:5173/`. Vite binds to all interfaces so that another device on the same trusted network can use the network URL printed in the terminal. Do not expose the development server directly to the internet. If port 5173 is occupied, use the fallback URL printed by Vite.
+
+### Production-like npm preview
 
 ```bash
-docker compose up -d --build
+npm ci
+npm start
 ```
 
-Then open `http://localhost:8080/` unless `DHCPULSE_PORT` is set to another port.
+Open `http://localhost:4173/`. This command creates a verified production build before starting the local preview server. The preview server is intended for local validation, not public hosting.
+
+### Docker Compose
+
+```bash
+docker compose pull
+docker compose up -d --wait
+```
+
+Open `http://localhost:8080/` after Compose reports the service as healthy. The default Compose file pulls the official `ghcr.io/bifrost0x/dhcpulse:latest` image and never builds the checkout. To use another host port, set `DHCPULSE_PORT`, for example:
+
+```bash
+DHCPULSE_PORT=9080 docker compose up -d --wait
+```
+
+Then open `http://localhost:9080/`. Use `docker compose ps` for status and `docker compose logs dhcpulse` if startup does not complete.
+
+For an intentional local source build, use the separate developer override:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build --wait
+```
 
 ## 2. Create a supported input
 
