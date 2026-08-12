@@ -4,6 +4,7 @@ import exampleXml from '../../../samples/microsoft-dhcp-realistic-large.xml?raw'
 import type { Locale } from '../../content/copy';
 import { ConfigImportError, importDhcpConfiguration } from '../../domain/config-import';
 import { buildConfigurationWorkspace, type ConfigurationWorkspace } from '../../domain/config-workspace';
+import { ConfigurationExportGuide } from './ConfigurationExportGuide';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
@@ -84,6 +85,7 @@ export function ConfigurationEntry({ locale, headingRef, onOpen, notice }: Props
         <div><strong>{c.private}</strong><p>{c.privateText}</p></div>
       </aside>
     </section>
+    <ConfigurationExportGuide locale={locale} />
     <section className="config-utilities-link planner-card">
       <Wrench size={22} aria-hidden="true" />
       <div><strong>{locale === 'de' ? 'Einzelne DHCP-Aufgabe lösen?' : 'Need a focused DHCP calculator?'}</strong><p>{locale === 'de' ? 'Die Spezialwerkzeuge bleiben separat verfügbar.' : 'The specialist utilities remain available separately.'}</p></div>

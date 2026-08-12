@@ -49,6 +49,34 @@ describe('DHCPulse Workbench', () => {
     expect(screen.queryByText('11 tools ready')).not.toBeInTheDocument();
   });
 
+  it('guides a Microsoft administrator from PowerShell export to local import', () => {
+    renderAt();
+
+    const guide = screen.getByRole('region', { name: 'Create a Microsoft DHCP export' });
+    expect(within(guide).getByText('Run on the DHCP server')).toBeVisible();
+    expect(within(guide).getByText(/DHCP Server PowerShell module/)).toBeVisible();
+    expect(within(guide).getByText("$ExportPath = Join-Path $env:TEMP 'dhcpulse-export.xml'", { exact: false })).toBeVisible();
+    expect(within(guide).getByLabelText('PowerShell command for the full export')).toHaveTextContent(/Export-DhcpServer -ComputerName \$env:COMPUTERNAME/);
+    expect(within(guide).getByText(/Do not add.*-Leases/i)).toBeVisible();
+    expect(within(guide).getByText(/-ScopeId 10\.10\.10\.0/)).toBeVisible();
+    expect(within(guide).getByText(/hostnames, IP addresses, and client identifiers/i)).toBeVisible();
+    expect(within(guide).getByRole('link', { name: 'Open the official Export-DhcpServer documentation' })).toHaveAttribute('href', 'https://learn.microsoft.com/en-us/powershell/module/dhcpserver/export-dhcpserver?view=windowsserver2025-ps');
+    expect(within(guide).getByText('Kea, ISC dhcpd, or dnsmasq?')).toBeVisible();
+  });
+
+  it('localizes the integrated export guide in German', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+
+    const guide = screen.getByRole('region', { name: 'Microsoft-DHCP-Export erstellen' });
+    expect(within(guide).getByText('Auf dem DHCP-Server ausführen')).toBeVisible();
+    expect(within(guide).getByText(/DHCP-Server-PowerShell-Modul/)).toBeVisible();
+    expect(within(guide).getByText(/Füge.*-Leases.*nicht hinzu/i)).toBeVisible();
+    expect(within(guide).getByText('Kea, ISC dhcpd oder dnsmasq?')).toBeVisible();
+    expect(within(guide).getByRole('link', { name: 'Offizielle Export-DhcpServer-Dokumentation öffnen' })).toBeVisible();
+  });
+
   it('rejects oversized primary imports before reading and cancels a pending read on route exit', async () => {
     const user = userEvent.setup();
     renderAt();
