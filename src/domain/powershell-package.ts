@@ -64,7 +64,8 @@ export async function generatePowerShellPackage(
     throw new Error('The change set is not eligible for package generation.');
   }
 
-  const fragments = result.changeSet.operations.map((operation) => operationFragments(workspace.configuration, operation));
+  const orderedOperations = orderOperationsForExecution(result.changeSet.operations);
+  const fragments = orderedOperations.map((operation) => operationFragments(workspace.configuration, operation));
   const artifacts: GeneratedArtifact[] = [
     artifact('01-Preflight.ps1', scriptMime, buildScript(serverName, 'Preflight', fragments.flatMap(({ preflight }) => preflight), 'Preflight completed successfully.')),
     artifact('02-Apply.ps1', scriptMime, buildScript(serverName, 'Apply', fragments.flatMap(({ apply }) => apply), 'Apply completed successfully.')),
@@ -80,6 +81,19 @@ export async function generatePowerShellPackage(
   })));
   artifacts.push(artifact('manifest.json', jsonMime, `${stableJson({ generator: 'DHCPulse', schemaVersion: 1, generatedAt: generatedAt.toISOString(), files: manifestFiles })}\n`));
   return { artifacts };
+}
+
+function orderOperationsForExecution(operations: DhcpChangeOperation[]): DhcpChangeOperation[] {
+  return operations
+    .map((operation, index) => ({ operation, index }))
+    .sort((left, right) => executionRank(left.operation) - executionRank(right.operation) || left.index - right.index)
+    .map(({ operation }) => operation);
+}
+
+function executionRank(operation: DhcpChangeOperation): number {
+  if (operation.kind === 'exclusion.remove' || operation.kind === 'reservation.remove' || operation.kind === 'reservation.update') return 0;
+  if (operation.kind === 'exclusion.add' || operation.kind === 'reservation.add') return 2;
+  return 1;
 }
 
 function operationFragments(configuration: DhcpConfiguration, operation: DhcpChangeOperation): ScriptFragments {

@@ -31,9 +31,10 @@ describe('remediation queue', () => {
       'invalid-address-option',
       'reservation-in-dynamic-pool',
       'gateway-in-dynamic-pool',
+      'scope-option-overrides-server',
     ]);
     expect(queue.sections.review.map(({ ruleId }) => ruleId)).toContain('failover-scope-membership-missing');
-    expect(queue.sections.observe.map(({ ruleId }) => ruleId)).toContain('scope-option-overrides-server');
+    expect(queue.sections.observe.map(({ ruleId }) => ruleId)).not.toContain('scope-option-overrides-server');
     expect(queue.totals['act-now']).toBeGreaterThan(queue.sections['act-now'].length);
   });
 

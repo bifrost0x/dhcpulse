@@ -138,6 +138,64 @@ describe('DHCPulse Workbench', () => {
     expect(within(context).getByRole('button', { name: 'Preview change' })).toBeVisible();
   });
 
+  it('turns a guided reservation finding into a validated change without guessing the new address', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is outside its scope' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+
+    expect(within(context).getByRole('heading', { name: 'Available changes' })).toBeVisible();
+    await user.click(within(context).getByRole('button', { name: 'Correct reservation address' }));
+    const address = within(context).getByRole('textbox', { name: 'IPv4 address' });
+    expect(address).toHaveValue('198.51.100.250');
+    await user.clear(address);
+    await user.type(address, '192.0.2.40');
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+
+    expect(within(context).getByRole('heading', { name: 'Validated change preview' })).toBeVisible();
+    expect(within(context).getByText(/^192\.0\.2\.40 ·/)).toBeVisible();
+    const preview = within(context).getByRole('heading', { name: 'Validated change preview' }).closest('section')!;
+    expect(within(preview).getAllByRole('definition')[0]).toHaveTextContent('device-025.lab.example · 198.51.100.250');
+    await user.click(within(context).getByRole('button', { name: 'Add to change plan' }));
+    expect(screen.getByRole('region', { name: 'Review tray' })).toHaveTextContent('1 prepared change');
+  });
+
+  it('associates guided change validation errors with the responsible field', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is outside its scope' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Correct reservation address' }));
+    const address = within(context).getByRole('textbox', { name: 'IPv4 address' });
+    await user.clear(address);
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+
+    expect(address).toHaveAttribute('aria-invalid', 'true');
+    expect(address).toHaveAccessibleDescription('Enter a valid value.');
+    expect(within(context).getByRole('alert')).toHaveTextContent('Review the values and try again.');
+  });
+
+  it('offers both safe resolutions for a scope option override', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Scope option overrides the server value' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+
+    expect(within(context).getByRole('button', { name: 'Align with server value' })).toBeVisible();
+    expect(within(context).getByRole('button', { name: 'Remove scope override' })).toBeVisible();
+    await user.click(within(context).getByRole('button', { name: 'Align with server value' }));
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    expect(within(context).getByText('Set option value')).toBeVisible();
+    await user.click(within(context).getByRole('button', { name: 'Add to change plan' }));
+    expect(screen.getByRole('region', { name: 'Review tray' })).toHaveTextContent('1 prepared change');
+  });
+
   it('moves from the explained overview into a prioritized issue queue', async () => {
     const user = userEvent.setup();
     renderAt();
@@ -163,6 +221,7 @@ describe('DHCPulse Workbench', () => {
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Actionability' }), 'actionable');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Scope' }), screen.getByRole('option', { name: 'Office VLAN 100' }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
 
     const context = screen.getByRole('complementary', { name: 'Finding context' });
     const row = screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' });
@@ -203,7 +262,7 @@ describe('DHCPulse Workbench', () => {
     await user.click(screen.getByRole('button', { name: 'Review changes' }));
     const changes = screen.getByRole('heading', { name: 'Prepared changes' }).closest('section')!;
     expect(changes).toBeVisible();
-    expect(within(changes).getByText('Target scope')).toBeVisible();
+    expect(within(changes).getByText('Target')).toBeVisible();
     expect(within(changes).getByText('Rationale')).toBeVisible();
     expect(within(changes).getByText('No exclusion for this address')).toBeVisible();
     expect(within(changes).getByText('203.0.113.13')).toBeVisible();
@@ -233,7 +292,34 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('heading', { name: 'Guarded change package' })).toBeVisible();
   });
 
-  it('returns from each prepared operation to its exact finding occurrence', async () => {
+  it('returns from each prepared operation to its exact finding rationale', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
+    let context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
+
+    await user.click(screen.getByRole('button', { name: 'Review Scope option overrides the server value' }));
+    context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Align with server value' }));
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to change plan' }));
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+
+    const rationaleButtons = screen.getAllByRole('button', { name: 'Review issue rationale' });
+    expect(rationaleButtons).toHaveLength(2);
+    await user.click(rationaleButtons[0]!);
+    context = screen.getByRole('complementary', { name: 'Finding context' });
+    expect(within(context).getByRole('heading', { name: 'Reservation is inside a dynamic pool' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Review changes' }));
+    await user.click(screen.getAllByRole('button', { name: 'Review issue rationale' })[1]!);
+    expect(within(screen.getByRole('complementary', { name: 'Finding context' })).getByRole('heading', { name: 'Scope option overrides the server value' })).toBeVisible();
+  });
+
+  it('never adds an invalid legacy exclusion preview to the change plan', async () => {
     const user = userEvent.setup();
     renderAt();
     await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
@@ -241,19 +327,19 @@ describe('DHCPulse Workbench', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Scope' }), screen.getByRole('option', { name: 'Office VLAN 100' }));
     await user.click(screen.getByRole('button', { name: 'Review Reservation is inside a dynamic pool' }));
     let context = screen.getByRole('complementary', { name: 'Finding context' });
+    for (let index = 0; index < 24 && !within(context).queryByText('192.0.2.8'); index += 1) {
+      await user.click(within(context).getByRole('button', { name: 'Next occurrence' }));
+      context = screen.getByRole('complementary', { name: 'Finding context' });
+    }
+    expect(within(context).getByText('192.0.2.8')).toBeVisible();
     await user.click(within(context).getByRole('button', { name: 'Preview change' }));
     await user.click(within(context).getByRole('button', { name: 'Add to review' }));
-    await user.click(within(context).getByRole('button', { name: 'Next occurrence' }));
-    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
-    await user.click(within(context).getByRole('button', { name: 'Add to review' }));
-    await user.click(screen.getByRole('button', { name: 'Review changes' }));
-
-    await user.click(screen.getAllByRole('button', { name: 'Review issue rationale' })[0]!);
+    await user.click(screen.getByRole('button', { name: 'Review Gateway is inside a dynamic pool' }));
     context = screen.getByRole('complementary', { name: 'Finding context' });
-    expect(within(context).getByText('Occurrence 1 of 24')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Review changes' }));
-    await user.click(screen.getAllByRole('button', { name: 'Review issue rationale' })[1]!);
-    expect(within(screen.getByRole('complementary', { name: 'Finding context' })).getByText('Occurrence 2 of 24')).toBeVisible();
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+
+    expect(within(context).getByText('Validation blocked')).toBeVisible();
+    expect(within(context).getByRole('button', { name: 'Add to review' })).toBeDisabled();
   });
 
   it('localizes the operational queue and keeps non-Microsoft findings analysis-only', async () => {
@@ -460,6 +546,92 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('heading', { name: 'Object inventory' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Select an object' })).toBeVisible();
     expect(within(objectResults).getAllByRole('button').length).toBeGreaterThan(0);
+  });
+
+  it('prepares guided scope changes directly from the inventory', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Inventory/ }));
+    await user.click(screen.getByRole('button', { name: /Show IPv4 scope objects/ }));
+    await user.click(screen.getByRole('button', { name: /Office VLAN 100/ }));
+    const detail = screen.getByRole('heading', { name: 'Office VLAN 100' }).closest('section')!;
+
+    expect(within(detail).getByRole('heading', { name: 'Available changes' })).toBeVisible();
+    expect(within(detail).getByRole('button', { name: 'Edit address range' })).toBeVisible();
+    expect(within(detail).getByRole('button', { name: 'Set lease duration' })).toBeVisible();
+    expect(within(detail).getByRole('button', { name: 'Clone scope' })).toBeVisible();
+    await user.click(within(detail).getByRole('button', { name: 'Set lease duration' }));
+    const lease = within(detail).getByRole('spinbutton', { name: 'Lease duration in seconds' });
+    await user.clear(lease);
+    await user.type(lease, '14400');
+    await user.click(within(detail).getByRole('button', { name: 'Preview change' }));
+    expect(within(detail).getByText('14,400 seconds')).toBeVisible();
+    await user.click(within(detail).getByRole('button', { name: 'Add to change plan' }));
+    await user.click(screen.getByRole('tab', { name: 'Change plan (1)' }));
+    expect(screen.getByText('Inventory change validated against the imported configuration')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Review target in inventory' }));
+    expect(screen.getByRole('tab', { name: /Inventory/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Office VLAN 100' })).toHaveFocus();
+  });
+
+  it('treats a cloned scope as a new package target from preview through export', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Inventory/ }));
+    await user.click(screen.getByRole('button', { name: /Show IPv4 scope objects/ }));
+    await user.click(screen.getByRole('button', { name: /Office VLAN 100/ }));
+    const detail = screen.getByRole('heading', { name: 'Office VLAN 100' }).closest('section')!;
+
+    await user.click(within(detail).getByRole('button', { name: 'Clone scope' }));
+    await user.clear(within(detail).getByRole('textbox', { name: 'New scope CIDR' }));
+    await user.type(within(detail).getByRole('textbox', { name: 'New scope CIDR' }), '10.44.0.0/24');
+    await user.clear(within(detail).getByRole('textbox', { name: 'New scope name' }));
+    await user.type(within(detail).getByRole('textbox', { name: 'New scope name' }), 'Branch VLAN 44');
+    await user.clear(within(detail).getByRole('textbox', { name: 'Start address' }));
+    await user.type(within(detail).getByRole('textbox', { name: 'Start address' }), '10.44.0.20');
+    await user.clear(within(detail).getByRole('textbox', { name: 'End address' }));
+    await user.type(within(detail).getByRole('textbox', { name: 'End address' }), '10.44.0.240');
+    await user.click(within(detail).getByRole('button', { name: 'Preview change' }));
+    expect(within(detail).getByText('New scope · Branch VLAN 44 · 10.44.0.0/24')).toBeVisible();
+    await user.click(within(detail).getByRole('button', { name: 'Add to change plan' }));
+
+    await user.click(screen.getByRole('tab', { name: 'Change plan (1)' }));
+    expect(screen.getByText('New scope · Branch VLAN 44 · 10.44.0.0/24')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Review source scope in inventory' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Review export' }));
+    expect(screen.getByText('New scope 10.44.0.0/24 · Branch VLAN 44')).toBeVisible();
+    expect(screen.getByText('Ready to generate')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Generate guarded package' })).toBeEnabled();
+  });
+
+  it('prepares a reversible exclusion removal from the inventory', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Inventory/ }));
+    await user.click(screen.getByRole('button', { name: /Show Exclusion objects/ }));
+    const detail = document.querySelector<HTMLElement>('.workspace-object')!;
+
+    await user.click(within(detail).getByRole('button', { name: 'Remove exclusion' }));
+    await user.click(within(detail).getByRole('button', { name: 'Preview change' }));
+    expect(within(detail).getByText('Remove exclusion range')).toBeVisible();
+    await user.click(within(detail).getByRole('button', { name: 'Add to change plan' }));
+    await user.click(screen.getByRole('tab', { name: 'Change plan (1)' }));
+    expect(screen.getByText('Remove exclusion range')).toBeVisible();
+  });
+
+  it('explains when an inventory object is intentionally analysis-only', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Inventory/ }));
+    await user.click(screen.getByRole('button', { name: /Show Policy objects/ }));
+    const detail = document.querySelector<HTMLElement>('.workspace-object')!;
+
+    expect(within(detail).getByRole('heading', { name: 'Analysis only for this object' })).toBeVisible();
+    expect(within(detail).getByText(/policy, failover, and DHCPv6 changes.*need additional server context/i)).toBeVisible();
   });
 
   it('localizes the complete shared finding explanation in German', async () => {

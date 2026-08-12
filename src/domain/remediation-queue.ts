@@ -36,6 +36,7 @@ export interface RemediationOccurrenceContext {
 
 export interface TargetRiskSummary {
   targetScopeIds: string[];
+  newScopes: Array<{ cidr: string; name: string }>;
   blockerRules: Array<{ ruleId: string; count: number }>;
   warningRules: Array<{ ruleId: string; count: number }>;
 }
@@ -163,7 +164,7 @@ export function summarizeTargetRisk(
   workspace: ConfigurationWorkspace,
   result: ChangeSetResult,
 ): TargetRiskSummary {
-  const targetScopeIds = evaluatePackageEligibility(workspace, result).targetScopeIds;
+  const { targetScopeIds, newScopes } = evaluatePackageEligibility(workspace, result);
   const relevant = groupWorkspaceFindings(workspace)
     .filter(({ scopeIds }) => scopeIds.some((id) => targetScopeIds.includes(id)));
   const rules = (severity: WorkspaceFinding['severity']) => relevant
@@ -174,7 +175,7 @@ export function summarizeTargetRisk(
         .some((scopeId) => targetScopeIds.includes(scopeId))).length,
     }))
     .filter(({ count }) => count > 0);
-  return { targetScopeIds, blockerRules: rules('blocker'), warningRules: rules('warning') };
+  return { targetScopeIds, newScopes, blockerRules: rules('blocker'), warningRules: rules('warning') };
 }
 
 function weakestConfidence(findings: WorkspaceFinding[]): WorkspaceFinding['confidence'] {

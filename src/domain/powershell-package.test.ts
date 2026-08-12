@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import microsoftXml from '../test/fixtures/microsoft-dhcp.xml?raw';
 import { importDhcpConfiguration } from './config-import';
-import { addChangeOperation, createChangeSet, type DhcpChangeOperation } from './dhcp-change-set';
+import { addChangeOperation, createChangeSet, validateChangeSet, type DhcpChangeOperation } from './dhcp-change-set';
 import { buildMicrosoftWorkspace } from './microsoft-workspace';
 import { generatePowerShellPackage, quotePowerShellLiteral } from './powershell-package';
 
@@ -97,6 +97,41 @@ describe('PowerShell change package', () => {
     expect(rollback).toContain('Set-DhcpServerv4Reservation');
     expect(rollback).toContain('Set-DhcpServerv4OptionValue');
     expect(artifactContent(pkg.artifacts, 'CHANGE.md')).toContain('Betriebsdaten - vor Weitergabe prüfen');
+  });
+
+  it('orders dependent removals before a range shrink and reverses that order for rollback', async () => {
+    const { configuration, workspace } = setup();
+    const scope = configuration.ipv4Scopes[0]!;
+    const exclusion = configuration.exclusions[0]!;
+    const reservation = configuration.reservations[0]!;
+    const result = validateChangeSet(workspace, {
+      ...createChangeSet(workspace),
+      operations: [
+        {
+          id: 'shrink-range', kind: 'scope-range.set', targetId: scope.id,
+          before: { start: scope.startRange!, end: scope.endRange! },
+          after: { start: '192.0.2.60', end: '192.0.2.100' },
+        },
+        {
+          id: 'remove-exclusion', kind: 'exclusion.remove', targetId: exclusion.id,
+          before: { scopeId: scope.id, start: exclusion.start, end: exclusion.end },
+        },
+        {
+          id: 'remove-reservation', kind: 'reservation.remove', targetId: reservation.id,
+          before: { address: reservation.address, clientId: reservation.identifier!, hostname: reservation.hostname },
+        },
+      ],
+    });
+    expect(result.valid).toBe(true);
+
+    const pkg = await generatePowerShellPackage(workspace, result, 'en', new Date('2026-08-12T10:00:00.000Z'));
+    const apply = artifactContent(pkg.artifacts, '02-Apply.ps1');
+    const rollback = artifactContent(pkg.artifacts, '04-Rollback.ps1');
+
+    expect(apply.indexOf('# remove-exclusion')).toBeLessThan(apply.indexOf('# shrink-range'));
+    expect(apply.indexOf('# remove-reservation')).toBeLessThan(apply.indexOf('# shrink-range'));
+    expect(rollback.indexOf('# shrink-range')).toBeLessThan(rollback.indexOf('# remove-exclusion'));
+    expect(rollback.indexOf('# shrink-range')).toBeLessThan(rollback.indexOf('# remove-reservation'));
   });
 
   it('computes the manifest from exact UTF-8 artifact contents', async () => {

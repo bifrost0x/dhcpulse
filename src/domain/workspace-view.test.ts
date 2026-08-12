@@ -75,6 +75,22 @@ describe('scope-first workspace selectors', () => {
     }))).toMatchObject({ eligible: false });
   });
 
+  it('assesses a cloned destination instead of unrelated findings on its source scope', () => {
+    const workspace = largeWorkspace();
+    const source = workspace.configuration.ipv4Scopes.find(({ name }) => name === 'Office VLAN 100')!;
+    const result = addChangeOperation(workspace, createChangeSet(workspace), {
+      id: 'branch-clone', kind: 'scope.clone', targetId: source.id,
+      after: { cidr: '10.44.0.0/24', name: 'Branch VLAN 44', subnetMask: '255.255.255.0', start: '10.44.0.20', end: '10.44.0.200', leaseSeconds: 28800 },
+    });
+
+    expect(evaluatePackageEligibility(workspace, result)).toMatchObject({
+      eligible: true,
+      blockers: [],
+      targetScopeIds: [],
+      newScopes: [{ cidr: '10.44.0.0/24', name: 'Branch VLAN 44' }],
+    });
+  });
+
   it('refuses direct package generation for a blocked target', async () => {
     const workspace = largeWorkspace();
     const scope = workspace.configuration.ipv4Scopes.find(({ name }) => name === 'Office VLAN 100')!;

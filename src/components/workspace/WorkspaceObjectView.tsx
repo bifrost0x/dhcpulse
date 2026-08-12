@@ -1,15 +1,17 @@
 import type { Locale } from '../../content/copy';
 import type { MicrosoftWorkspace, WorkspaceNode } from '../../domain/microsoft-workspace';
 import type { RefObject } from 'react';
+import type { ReactNode } from 'react';
 
 interface WorkspaceObjectViewProps {
   locale: Locale;
   workspace: MicrosoftWorkspace;
   selected: WorkspaceNode;
   headingRef?: RefObject<HTMLHeadingElement | null>;
+  actionPanel?: ReactNode;
 }
 
-export function WorkspaceObjectView({ locale, workspace, selected, headingRef }: WorkspaceObjectViewProps) {
+export function WorkspaceObjectView({ locale, workspace, selected, headingRef, actionPanel }: WorkspaceObjectViewProps) {
   const scope = workspace.configuration.ipv4Scopes.find(({ id }) => id === selected.id);
   const scopeSummary = scope ? workspace.scopeSummaries[scope.id] : undefined;
   return (
@@ -31,6 +33,7 @@ export function WorkspaceObjectView({ locale, workspace, selected, headingRef }:
         <section className="workspace-related"><h3>{locale === 'de' ? 'Wirksame Optionen' : 'Effective options'}</h3><ul>{scopeSummary.effectiveOptions.slice(0, 50).map((option) => <li key={option.optionId}><span>Option {option.code ?? option.name}</span><code>{displayValue(option.value)}</code><small>{levelLabel(option.sourceLevel, locale)}</small></li>)}</ul>{scopeSummary.effectiveOptions.length > 50 && <p>{locale === 'de' ? `Die ersten 50 von ${scopeSummary.effectiveOptions.length} Optionen werden angezeigt. Suche die Option für vollständige Details direkt.` : `Showing the first 50 of ${scopeSummary.effectiveOptions.length} options. Search for an option directly to inspect its full detail.`}</p>}</section>
       </>}
       {!scope && <ObjectFacts workspace={workspace} node={selected} locale={locale} />}
+      {actionPanel}
       <footer className="workspace-provenance"><span>{locale === 'de' ? 'Quelle' : 'Source'}</span><code>{selected.provenance.location}</code></footer>
     </section>
   );

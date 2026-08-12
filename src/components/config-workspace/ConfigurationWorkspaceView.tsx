@@ -3,12 +3,15 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Locale } from '../../content/copy';
 import { createChangeSet, removeChangeOperation, type ChangeSetResult, type DhcpChangeOperation } from '../../domain/dhcp-change-set';
 import { prepareFindingAction } from '../../domain/finding-actions';
+import { listInventoryActions, prepareInventoryAction } from '../../domain/inventory-actions';
 import type { ConfigurationWorkspace, WorkspaceFinding } from '../../domain/config-workspace';
 import { generatePowerShellPackage, type PowerShellPackage } from '../../domain/powershell-package';
 import { summarizeTargetRisk } from '../../domain/remediation-queue';
 import { evaluatePackageEligibility } from '../../domain/workspace-view';
 import { WorkspaceObjectView } from '../workspace/WorkspaceObjectView';
 import { RemediationQueue, type RemediationQueueHandle } from './RemediationQueue';
+import { WorkspaceActionComposer } from './WorkspaceActionComposer';
+import { operationTargetLabel } from './workspace-display';
 
 type Tab = 'overview' | 'remediate' | 'objects' | 'changes' | 'package';
 const tabOrder: Tab[] = ['overview', 'remediate', 'objects', 'changes', 'package'];
@@ -108,6 +111,12 @@ export function ConfigurationWorkspaceView({ locale, workspace, fileName, headin
     selectTab(next);
   }
 
+  function openObject(id: string) {
+    pendingTabFocus.current = null;
+    setSelectedId(id);
+    setTab('objects');
+  }
+
   function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next: number | null = null;
     if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
@@ -128,6 +137,11 @@ export function ConfigurationWorkspaceView({ locale, workspace, fileName, headin
     if (tab !== 'remediate') setTab('changes');
   }
 
+  function acceptChangeResult(result: ChangeSetResult) {
+    setChangeResult(result);
+    setGenerated(null);
+  }
+
   return <section className="configuration-workspace" aria-labelledby="configuration-workspace-heading">
     <header className="workspace-session-header">
       <div><p className="section-kicker">{vendorLabel}</p><h1 id="configuration-workspace-heading" ref={headingRef} tabIndex={-1}>{locale === 'de' ? 'DHCP-Konfiguration prüfen' : 'DHCP configuration review'}</h1><p><span>{imported}</span> · {fileName}</p><p className="workspace-purpose">{locale === 'de' ? 'DHCPulse erklärt den importierten Zustand, priorisiert Probleme und bereitet überprüfbare Änderungen vor. Es verbindet sich mit keinem Server und führt nichts aus.' : 'DHCPulse explains the imported state, prioritizes issues, and prepares reviewable changes. It never connects to a server or executes anything.'}</p></div>
@@ -137,10 +151,10 @@ export function ConfigurationWorkspaceView({ locale, workspace, fileName, headin
       {tabs.map((item, index) => <button key={item.id} id={`workspace-tab-${item.id}`} ref={(node) => { tabRefs.current[index] = node; }} type="button" role="tab" tabIndex={tab === item.id ? 0 : -1} aria-selected={tab === item.id} aria-controls={`workspace-panel-${item.id}`} onClick={() => selectTab(item.id)} onKeyDown={(event) => handleTabKey(event, index)}>{item.label}</button>)}
     </div>
     <div id={`workspace-panel-${tab}`} className="workspace-product-panel" role="tabpanel" aria-labelledby={`workspace-tab-${tab}`}>
-      <div hidden={tab !== 'remediate'}><RemediationQueue ref={remediationRef} locale={locale} workspace={workspace} result={changeResult} titleFor={(ruleId) => titles[locale][ruleId] ?? ruleId} explanationFor={(ruleId) => explanations[locale][ruleId] ?? { rationale: locale === 'de' ? 'Die importierten Felder haben diese Regel ausgelöst.' : 'The imported fields triggered this rule.', impact: locale === 'de' ? 'Der Befund sollte im Umgebungskontext geprüft werden.' : 'Review this finding in the environment context.', recommendation: locale === 'de' ? 'Evidenz und Quellobjekt vor Änderungen prüfen.' : 'Review evidence and source object before changes.' }} evidenceLabel={(key) => evidenceLabel(key, locale)} onPrepare={prepare} onOpenObject={(id) => { setSelectedId(id); navigateToTab('objects'); }} onReviewChanges={() => navigateToTab('changes')} /></div>
+      <div hidden={tab !== 'remediate'}><RemediationQueue ref={remediationRef} locale={locale} workspace={workspace} result={changeResult} titleFor={(ruleId) => titles[locale][ruleId] ?? ruleId} explanationFor={(ruleId) => explanations[locale][ruleId] ?? { rationale: locale === 'de' ? 'Die importierten Felder haben diese Regel ausgelöst.' : 'The imported fields triggered this rule.', impact: locale === 'de' ? 'Der Befund sollte im Umgebungskontext geprüft werden.' : 'Review this finding in the environment context.', recommendation: locale === 'de' ? 'Evidenz und Quellobjekt vor Änderungen prüfen.' : 'Review evidence and source object before changes.' }} evidenceLabel={(key) => evidenceLabel(key, locale)} onPrepare={prepare} onPrepareResult={acceptChangeResult} onOpenObject={openObject} onReviewChanges={() => navigateToTab('changes')} /></div>
       {tab === 'overview' && <Overview locale={locale} workspace={workspace} changeCount={changeResult?.changeSet.operations.length ?? 0} onOpenObjects={() => navigateToTab('objects')} onReviewFindings={() => navigateToTab('remediate')} onReviewChanges={() => navigateToTab('changes')} />}
-      {tab === 'objects' && <Objects locale={locale} workspace={workspace} selected={selected} onSelect={setSelectedId} />}
-      {tab === 'changes' && <Changes locale={locale} workspace={workspace} result={changeResult} onBack={(findingId, targetScopeId) => { if (findingId) remediationRef.current?.focusFinding(findingId, targetScopeId); navigateToTab('remediate'); }} onExport={() => navigateToTab('package')} onRemove={(id) => { if (changeResult) setChangeResult(removeChangeOperation(workspace, changeResult.changeSet, id)); setGenerated(null); }} />}
+      {tab === 'objects' && <Objects locale={locale} workspace={workspace} selected={selected} result={changeResult} onSelect={setSelectedId} onPrepareResult={acceptChangeResult} />}
+      {tab === 'changes' && <Changes locale={locale} workspace={workspace} result={changeResult} onBack={(findingId, targetScopeId) => { if (findingId) remediationRef.current?.focusFinding(findingId, targetScopeId); navigateToTab('remediate'); }} onReviewTarget={openObject} onExport={() => navigateToTab('package')} onRemove={(id) => { if (changeResult) setChangeResult(removeChangeOperation(workspace, changeResult.changeSet, id)); setGenerated(null); }} />}
       {tab === 'package' && <Package locale={locale} workspace={workspace} result={changeResult} generated={generated} onGenerated={setGenerated} onReviewIssues={() => navigateToTab('remediate')} />}
     </div>
   </section>;
@@ -183,16 +197,17 @@ function Overview({ locale, workspace, changeCount, onOpenObjects, onReviewFindi
   </div>;
 }
 
-function Objects({ locale, workspace, selected, onSelect }: { locale: Locale; workspace: ConfigurationWorkspace; selected: ConfigurationWorkspace['nodes'][number] | null; onSelect: (id: string | null) => void }) {
+function Objects({ locale, workspace, selected, result, onSelect, onPrepareResult }: { locale: Locale; workspace: ConfigurationWorkspace; selected: ConfigurationWorkspace['nodes'][number] | null; result: ChangeSetResult | null; onSelect: (id: string | null) => void; onPrepareResult: (result: ChangeSetResult) => void }) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<'all' | ConfigurationWorkspace['nodes'][number]['kind']>('all');
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
-  const pendingDetailFocus = useRef(false);
+  const pendingDetailFocus = useRef(Boolean(selected));
   const normalized = query.trim().toLocaleLowerCase();
   const filtered = workspace.nodes.filter((node) => (kind === 'all' || node.kind === kind) && (!normalized || node.searchableText.includes(normalized)));
   const results = filtered.slice(0, 100);
   const counts = workspace.nodes.reduce<Record<string, number>>((current, node) => ({ ...current, [node.kind]: (current[node.kind] ?? 0) + 1 }), {});
   const searchLabel = locale === 'de' ? 'Konfigurationsobjekte durchsuchen' : 'Search configuration objects';
+  const selectedActions = selected ? listInventoryActions(workspace, selected) : [];
   useEffect(() => {
     if (!selected || !pendingDetailFocus.current) return;
     detailHeadingRef.current?.focus();
@@ -225,20 +240,29 @@ function Objects({ locale, workspace, selected, onSelect }: { locale: Locale; wo
       <p>{locale === 'de' ? 'Maximal 100 Objekte werden gleichzeitig angezeigt.' : 'At most 100 objects are shown at once.'}</p>
       {results.length ? <ul className="workspace-object-results">{results.map((node) => <li key={node.id}><button type="button" className={selected?.id === node.id ? 'active' : ''} onClick={() => selectObject(node.id)}><strong>{node.label}</strong>{node.secondary && <span>{node.secondary}</span>}<small>{workspaceKindLabel(node.kind, locale)}</small></button></li>)}</ul> : <p className="workspace-object-empty">{locale === 'de' ? 'Keine passenden Objekte.' : 'No matching objects.'}</p>}
     </section>
-    {selected ? <WorkspaceObjectView locale={locale} workspace={workspace} selected={selected} headingRef={detailHeadingRef} /> : <Message title={locale === 'de' ? 'Objekt auswählen' : 'Select an object'} text={locale === 'de' ? 'Suche nach einem Objekt und öffne es für Details und Provenienz.' : 'Search for an object and open it for details and provenance.'} />}
+    {selected ? <WorkspaceObjectView locale={locale} workspace={workspace} selected={selected} headingRef={detailHeadingRef} actionPanel={selectedActions.length > 0 ? <WorkspaceActionComposer
+      locale={locale}
+      workspace={workspace}
+      subjectKey={`inventory:${selected.id}`}
+      actions={selectedActions}
+      currentResult={result}
+      build={(action, values) => prepareInventoryAction(workspace, selected, action.id, result?.changeSet ?? createChangeSet(workspace), values)}
+      onCommit={onPrepareResult}
+    /> : <section className="workspace-action-unavailable"><h3>{locale === 'de' ? 'Für dieses Objekt nur Analyse' : 'Analysis only for this object'}</h3><p>{workspace.format !== 'microsoft-xml'
+      ? (locale === 'de' ? 'Ausführbare Änderungspakete sind auf Microsoft-DHCP-XML beschränkt.' : 'Executable change packages are limited to Microsoft DHCP XML.')
+      : (locale === 'de' ? 'Richtlinien-, Failover- und DHCPv6-Änderungen sowie Objekte ohne vollständige Identität benötigen zusätzlichen Serverkontext und bleiben deshalb schreibgeschützt.' : 'Policy, failover, and DHCPv6 changes, plus objects without complete identity, need additional server context and therefore remain read-only.')}</p></section>} /> : <Message title={locale === 'de' ? 'Objekt auswählen' : 'Select an object'} text={locale === 'de' ? 'Suche nach einem Objekt und öffne es für Details und Provenienz.' : 'Search for an object and open it for details and provenance.'} />}
   </div>;
 }
 
-function Changes({ locale, workspace, result, onRemove, onBack, onExport }: { locale: Locale; workspace: ConfigurationWorkspace; result: ChangeSetResult | null; onRemove: (id: string) => void; onBack: (findingId?: string, targetScopeId?: string) => void; onExport: () => void }) {
+function Changes({ locale, workspace, result, onRemove, onBack, onReviewTarget, onExport }: { locale: Locale; workspace: ConfigurationWorkspace; result: ChangeSetResult | null; onRemove: (id: string) => void; onBack: (findingId?: string, targetScopeId?: string) => void; onReviewTarget: (id: string) => void; onExport: () => void }) {
   if (!workspace.capabilities.executableChanges) return <Message title={locale === 'de' ? 'Analyse ohne ausführbare Änderung' : 'Analysis without executable changes'} text={locale === 'de' ? 'Für ein geprüftes PowerShell-Paket wird ein Microsoft-DHCP-XML-Export benötigt.' : 'A Microsoft DHCP XML export is required for a guarded PowerShell package.'} />;
   if (!result?.changeSet.operations.length) return <Message title={locale === 'de' ? 'Noch keine Änderung vorgemerkt' : 'No changes prepared'} text={locale === 'de' ? 'Prüfe ein Problem, sieh dir die vorgeschlagene Änderung an und füge sie anschließend dem Änderungsplan hinzu.' : 'Review an issue, preview its suggested change, and then add it to the change plan.'} />;
   return <section className="planner-card workspace-prepared-changes"><header><div><span className="section-kicker">{locale === 'de' ? 'Prüfschritt' : 'Review step'}</span><h2>{locale === 'de' ? 'Vorgemerkte Änderungen' : 'Prepared changes'}</h2></div><button type="button" className="text-button" onClick={() => onBack()}>{locale === 'de' ? 'Zurück zu den Problemen' : 'Back to issues'}</button></header><ol>{result.changeSet.operations.map((operation) => {
     const finding = workspace.findings.find(({ id }) => id === operation.rationaleFindingId);
-    const scope = workspace.configuration.ipv4Scopes.find(({ id }) => id === operation.targetId);
     const before = operation.kind === 'exclusion.add' ? (locale === 'de' ? 'Kein Ausschluss für diese Adresse' : 'No exclusion for this address') : formatOperationState(operation, 'before', locale);
     const after = formatOperationState(operation, 'after', locale);
     const issues = result.issues.filter(({ operationId }) => operationId === operation.id);
-    return <li key={operation.id}><div className="workspace-change-review"><strong>{operationLabel(operation.kind, locale)}</strong><dl><div><dt>{locale === 'de' ? 'Ziel-Scope' : 'Target scope'}</dt><dd>{scope ? `${scope.name ?? scope.cidr} · ${scope.cidr}` : operation.targetId}</dd></div><div><dt>{locale === 'de' ? 'Begründung' : 'Rationale'}</dt><dd>{finding ? titles[locale][finding.ruleId] ?? finding.ruleId : locale === 'de' ? 'Manuell vorbereitete Änderung' : 'Manually prepared change'}</dd></div><div><dt>{locale === 'de' ? 'Vorher' : 'Before'}</dt><dd>{before}</dd></div><div><dt>{locale === 'de' ? 'Nachher' : 'After'}</dt><dd>{after}</dd></div></dl>{issues.length > 0 && <ul className="workspace-change-issues">{issues.map((issue) => <li key={`${operation.id}-${issue.code}`}>{issueLabel(issue.code, locale)}</li>)}</ul>}</div><div className="workspace-change-actions"><button type="button" className="text-button" disabled={!finding} onClick={() => onBack(finding?.id, operation.targetId)}>{locale === 'de' ? 'Begründung beim Problem prüfen' : 'Review issue rationale'}</button><button type="button" className="text-button" onClick={() => onRemove(operation.id)}>{locale === 'de' ? 'Entfernen' : 'Remove'}</button></div></li>;
+    return <li key={operation.id}><div className="workspace-change-review"><strong>{operationLabel(operation.kind, locale)}</strong><dl><div><dt>{locale === 'de' ? 'Ziel' : 'Target'}</dt><dd>{operationTargetLabel(workspace, operation, locale)}</dd></div><div><dt>{locale === 'de' ? 'Begründung' : 'Rationale'}</dt><dd>{finding ? titles[locale][finding.ruleId] ?? finding.ruleId : locale === 'de' ? 'Bestandsänderung gegen die importierte Konfiguration validiert' : 'Inventory change validated against the imported configuration'}</dd></div><div><dt>{locale === 'de' ? 'Vorher' : 'Before'}</dt><dd>{before}</dd></div><div><dt>{locale === 'de' ? 'Nachher' : 'After'}</dt><dd>{after}</dd></div></dl>{issues.length > 0 && <ul className="workspace-change-issues">{issues.map((issue) => <li key={`${operation.id}-${issue.code}`}>{issueLabel(issue.code, locale)}</li>)}</ul>}</div><div className="workspace-change-actions">{finding ? <button type="button" className="text-button" onClick={() => onBack(finding.id, operation.targetId)}>{locale === 'de' ? 'Begründung beim Problem prüfen' : 'Review issue rationale'}</button> : <button type="button" className="text-button" onClick={() => onReviewTarget(operation.targetId)}>{operation.kind === 'scope.clone' ? (locale === 'de' ? 'Quell-Scope im Bestand prüfen' : 'Review source scope in inventory') : (locale === 'de' ? 'Ziel im Bestand prüfen' : 'Review target in inventory')}</button>}<button type="button" className="text-button" onClick={() => onRemove(operation.id)}>{locale === 'de' ? 'Entfernen' : 'Remove'}</button></div></li>;
   })}</ol>{result.issues.length > 0 && <ul className="workspace-change-issues">{result.issues.map((issue) => <li key={`${issue.operationId ?? 'set'}-${issue.code}`}>{issueLabel(issue.code, locale)}</li>)}</ul>}<div className="workspace-change-completion"><p className={result.valid ? 'validation-ok' : 'field-error'}>{result.valid ? (locale === 'de' ? 'Validierung bestanden.' : 'Validation passed.') : (locale === 'de' ? 'Validierung blockiert.' : 'Validation blocked.')}</p><button type="button" className="primary-button" disabled={!result.valid} onClick={onExport}>{locale === 'de' ? 'Export prüfen' : 'Review export'}</button></div></section>;
 }
 
@@ -291,7 +315,8 @@ function Package({ locale, workspace, result, generated, onGenerated, onReviewIs
   }
   const plannedArtifacts = ['01-Preflight.ps1', '02-Apply.ps1', '03-Verify.ps1', '04-Rollback.ps1', 'CHANGE.md', 'change-set.json', 'manifest.json'];
   const risk = result ? summarizeTargetRisk(workspace, result) : null;
-  return <section className="planner-card workspace-package-panel"><FileCheck2 size={24} aria-hidden="true" /><h2>{locale === 'de' ? 'Abgesichertes Änderungspaket' : 'Guarded change package'}</h2><p>{locale === 'de' ? 'DHCPulse führt nichts aus. Prüfe Preflight, Apply, Verify und Rollback vor der Ausführung.' : 'DHCPulse executes nothing. Review Preflight, Apply, Verify, and Rollback before execution.'}</p><section className="workspace-artifact-plan"><h3>{locale === 'de' ? 'Enthaltene Dateien' : 'Included files'}</h3><ul>{plannedArtifacts.map((name) => <li key={name}><code>{name}</code></li>)}</ul></section>{!result?.changeSet.operations.length ? <section className="workspace-package-empty" role="status"><h3>{locale === 'de' ? 'Zuerst eine Änderung vorbereiten' : 'Prepare a change first'}</h3><p>{locale === 'de' ? 'Der Export wird verfügbar, nachdem du ein Problem geprüft, die vorgeschlagene Änderung angesehen und dem Änderungsplan hinzugefügt hast.' : 'Export becomes available after you preview and add at least one change to the change plan.'}</p><button type="button" className="secondary-button" onClick={onReviewIssues}>{locale === 'de' ? 'Probleme mit Änderungsvorschlag prüfen' : 'Review changeable issues'}</button></section> : <>{risk && <section className="workspace-target-risk"><h3>{locale === 'de' ? 'Risiko der Ziel-Scopes' : 'Target scope risk'}</h3><div><strong>{locale === 'de' ? 'Ziele' : 'Targets'}</strong><ul>{risk.targetScopeIds.map((id) => { const scope = workspace.configuration.ipv4Scopes.find((candidate) => candidate.id === id); return <li key={id}>Scope {scope?.cidr ?? id} · {scope?.name ?? id}</li>; })}</ul></div>{risk.blockerRules.length > 0 && <div><strong>{locale === 'de' ? 'Blockierende Regeln' : 'Blocking rules'}</strong><ul>{risk.blockerRules.map(({ ruleId, count }) => <li key={ruleId}>{titles[locale][ruleId] ?? ruleId} ({count})</li>)}</ul></div>}{risk.warningRules.length > 0 && <div><strong>{locale === 'de' ? 'Warnungsregeln' : 'Warning rules'}</strong><ul>{risk.warningRules.map(({ ruleId, count }) => <li key={ruleId}>{titles[locale][ruleId] ?? ruleId} ({count})</li>)}</ul></div>}</section>}{checked && <div id="workspace-package-eligibility" className={`workspace-package-eligibility ${eligible ? 'eligible' : 'blocked'}`}><strong>{eligible ? (locale === 'de' ? 'Bereit zur Erzeugung' : 'Ready to generate') : (locale === 'de' ? 'Erzeugung blockiert' : 'Generation blocked')}</strong>{checked.blockers.length > 0 && <ul>{checked.blockers.map((blocker) => <li key={blocker}>{eligibilityLabel(blocker, locale)}</li>)}</ul>}{checked.warnings.length > 0 && <><ul>{checked.warnings.map((warning) => <li key={warning}>{eligibilityLabel(warning, locale)}</li>)}</ul><label className="workspace-warning-ack"><input type="checkbox" checked={warningsAcknowledged} onChange={(event) => setWarningsAcknowledged(event.target.checked)} />{locale === 'de' ? 'Ich habe die Warnungen der Ziel-Scopes geprüft.' : 'I reviewed the target warnings.'}</label></>}<span>{checked.targetScopeIds.length} {locale === 'de' ? (checked.targetScopeIds.length === 1 ? 'Ziel-Scope' : 'Ziel-Scopes') : (checked.targetScopeIds.length === 1 ? 'target scope' : 'target scopes')}</span></div>}<button type="button" className="primary-button" aria-describedby="workspace-package-eligibility" disabled={!eligible || generating} onClick={() => void generate()}>{generating ? (locale === 'de' ? 'Paket wird erzeugt…' : 'Generating package…') : (locale === 'de' ? 'Abgesichertes Paket erzeugen' : 'Generate guarded package')}</button>{generationError && <p className="field-error" role="alert">{generationError}</p>}{generated && <PackageDownloads key={generated.artifacts.at(-1)?.content} locale={locale} generated={generated} />}</>}</section>;
+  const targetCount = checked ? checked.targetScopeIds.length + checked.newScopes.length : 0;
+  return <section className="planner-card workspace-package-panel"><FileCheck2 size={24} aria-hidden="true" /><h2>{locale === 'de' ? 'Abgesichertes Änderungspaket' : 'Guarded change package'}</h2><p>{locale === 'de' ? 'DHCPulse führt nichts aus. Prüfe Preflight, Apply, Verify und Rollback vor der Ausführung.' : 'DHCPulse executes nothing. Review Preflight, Apply, Verify, and Rollback before execution.'}</p><section className="workspace-artifact-plan"><h3>{locale === 'de' ? 'Enthaltene Dateien' : 'Included files'}</h3><ul>{plannedArtifacts.map((name) => <li key={name}><code>{name}</code></li>)}</ul></section>{!result?.changeSet.operations.length ? <section className="workspace-package-empty" role="status"><h3>{locale === 'de' ? 'Zuerst eine Änderung vorbereiten' : 'Prepare a change first'}</h3><p>{locale === 'de' ? 'Der Export wird verfügbar, nachdem du ein Problem geprüft, die vorgeschlagene Änderung angesehen und dem Änderungsplan hinzugefügt hast.' : 'Export becomes available after you preview and add at least one change to the change plan.'}</p><button type="button" className="secondary-button" onClick={onReviewIssues}>{locale === 'de' ? 'Probleme mit Änderungsvorschlag prüfen' : 'Review changeable issues'}</button></section> : <>{risk && <section className="workspace-target-risk"><h3>{locale === 'de' ? 'Risiko der Ziel-Scopes' : 'Target scope risk'}</h3><div><strong>{locale === 'de' ? 'Ziele' : 'Targets'}</strong><ul>{risk.targetScopeIds.map((id) => { const scope = workspace.configuration.ipv4Scopes.find((candidate) => candidate.id === id); return <li key={id}>Scope {scope?.cidr ?? id} · {scope?.name ?? id}</li>; })}{risk.newScopes.map((scope) => <li key={scope.cidr}>{locale === 'de' ? 'Neuer Scope' : 'New scope'} {scope.cidr} · {scope.name}</li>)}</ul></div>{risk.blockerRules.length > 0 && <div><strong>{locale === 'de' ? 'Blockierende Regeln' : 'Blocking rules'}</strong><ul>{risk.blockerRules.map(({ ruleId, count }) => <li key={ruleId}>{titles[locale][ruleId] ?? ruleId} ({count})</li>)}</ul></div>}{risk.warningRules.length > 0 && <div><strong>{locale === 'de' ? 'Warnungsregeln' : 'Warning rules'}</strong><ul>{risk.warningRules.map(({ ruleId, count }) => <li key={ruleId}>{titles[locale][ruleId] ?? ruleId} ({count})</li>)}</ul></div>}</section>}{checked && <div id="workspace-package-eligibility" className={`workspace-package-eligibility ${eligible ? 'eligible' : 'blocked'}`}><strong>{eligible ? (locale === 'de' ? 'Bereit zur Erzeugung' : 'Ready to generate') : (locale === 'de' ? 'Erzeugung blockiert' : 'Generation blocked')}</strong>{checked.blockers.length > 0 && <ul>{checked.blockers.map((blocker) => <li key={blocker}>{eligibilityLabel(blocker, locale)}</li>)}</ul>}{checked.warnings.length > 0 && <><ul>{checked.warnings.map((warning) => <li key={warning}>{eligibilityLabel(warning, locale)}</li>)}</ul><label className="workspace-warning-ack"><input type="checkbox" checked={warningsAcknowledged} onChange={(event) => setWarningsAcknowledged(event.target.checked)} />{locale === 'de' ? 'Ich habe die Warnungen der Ziel-Scopes geprüft.' : 'I reviewed the target warnings.'}</label></>}<span>{targetCount} {locale === 'de' ? (targetCount === 1 ? 'Ziel-Scope' : 'Ziel-Scopes') : (targetCount === 1 ? 'target scope' : 'target scopes')}</span></div>}<button type="button" className="primary-button" aria-describedby="workspace-package-eligibility" disabled={!eligible || generating} onClick={() => void generate()}>{generating ? (locale === 'de' ? 'Paket wird erzeugt…' : 'Generating package…') : (locale === 'de' ? 'Abgesichertes Paket erzeugen' : 'Generate guarded package')}</button>{generationError && <p className="field-error" role="alert">{generationError}</p>}{generated && <PackageDownloads key={generated.artifacts.at(-1)?.content} locale={locale} generated={generated} />}</>}</section>;
 }
 
 function PackageDownloads({ locale, generated }: { locale: Locale; generated: PowerShellPackage }) {
@@ -311,9 +336,20 @@ function workspaceKindLabel(kind: ConfigurationWorkspace['nodes'][number]['kind'
   return labels[kind];
 }
 
-function operationLabel(kind: string, locale: Locale) {
-  if (kind === 'exclusion.add') return locale === 'de' ? 'Ausschluss hinzufügen' : 'Add exclusion';
-  return locale === 'de' ? 'DHCP-Änderung' : 'DHCP change';
+function operationLabel(kind: DhcpChangeOperation['kind'], locale: Locale) {
+  const labels: Record<DhcpChangeOperation['kind'], [string, string]> = {
+    'scope-range.set': ['Adressbereich ändern', 'Change address range'],
+    'scope-lease.set': ['Lease-Dauer ändern', 'Change lease duration'],
+    'exclusion.add': ['Ausschluss hinzufügen', 'Add exclusion'],
+    'exclusion.remove': ['Ausschlussbereich entfernen', 'Remove exclusion range'],
+    'reservation.add': ['Reservierung hinzufügen', 'Add reservation'],
+    'reservation.update': ['Reservierung aktualisieren', 'Update reservation'],
+    'reservation.remove': ['Reservierung entfernen', 'Remove reservation'],
+    'option.set': ['Optionswert festlegen', 'Set option value'],
+    'option.remove': ['Option entfernen', 'Remove option'],
+    'scope.clone': ['Scope klonen', 'Clone scope'],
+  };
+  return labels[kind][locale === 'de' ? 0 : 1];
 }
 
 function issueLabel(code: string, locale: Locale) {

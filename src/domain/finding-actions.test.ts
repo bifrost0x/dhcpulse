@@ -8,6 +8,7 @@ import {
   listFindingActions,
   prepareFindingAction,
 } from './finding-actions';
+import { createChangeSet } from './dhcp-change-set';
 
 function workspace(text: string, fileName: string) {
   return buildConfigurationWorkspace(importDhcpConfiguration({ text, fileName }).configuration);
@@ -101,5 +102,179 @@ describe('finding actions', () => {
     expect(() => prepareFindingAction(current, unsafe, 'exclude-reserved-address')).toThrowError(
       expect.objectContaining<Partial<FindingActionError>>({ code: 'INVALID_EVIDENCE' }),
     );
+  });
+
+  it('lets an administrator keep one duplicate reservation and removes the conflicting records', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const original = imported.configuration.reservations[0]!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      reservations: [
+        original,
+        { ...original, id: 'duplicate-reservation', identifier: '02:00:5e:10:00:99', hostname: 'duplicate.example.com' },
+      ],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'duplicate-reservation-address')!;
+
+    expect(listFindingActions(current, finding)).toEqual([
+      expect.objectContaining({
+        id: 'resolve-duplicate-reservations',
+        mode: 'guided',
+        operationKind: 'reservation.remove',
+        fields: [expect.objectContaining({ name: 'keepReservationId', type: 'select', options: expect.arrayContaining([
+          expect.objectContaining({ value: original.id }),
+          expect.objectContaining({ value: 'duplicate-reservation' }),
+        ]) })],
+      }),
+    ]);
+
+    const result = prepareFindingAction(
+      current,
+      finding,
+      'resolve-duplicate-reservations',
+      createChangeSet(current),
+      { keepReservationId: original.id },
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.changeSet.operations).toEqual([
+      expect.objectContaining({
+        kind: 'reservation.remove',
+        targetId: 'duplicate-reservation',
+        rationaleFindingId: finding.id,
+      }),
+    ]);
+  });
+
+  it('builds a guided reservation address correction from the imported before-state', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const reservation = imported.configuration.reservations[0]!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      reservations: [{ ...reservation, address: '198.51.100.50' }],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'reservation-outside-scope')!;
+
+    expect(listFindingActions(current, finding)).toEqual([
+      expect.objectContaining({ id: 'update-reservation-address', mode: 'guided', operationKind: 'reservation.update' }),
+    ]);
+    const result = prepareFindingAction(
+      current,
+      finding,
+      'update-reservation-address',
+      createChangeSet(current),
+      { address: '192.0.2.60' },
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.changeSet.operations[0]).toEqual(expect.objectContaining({
+      kind: 'reservation.update',
+      targetId: reservation.id,
+      before: expect.objectContaining({ address: '198.51.100.50' }),
+      after: expect.objectContaining({ address: '192.0.2.60' }),
+    }));
+  });
+
+  it('offers guided correction for invalid address options', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const option = imported.configuration.options.find(({ code }) => code === 6)!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      options: imported.configuration.options.map((candidate) => candidate.id === option.id
+        ? { ...candidate, value: 'not-an-address' }
+        : candidate),
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'invalid-address-option')!;
+
+    expect(listFindingActions(current, finding)).toEqual([
+      expect.objectContaining({ id: 'set-valid-option-value', mode: 'guided', operationKind: 'option.set' }),
+    ]);
+    const result = prepareFindingAction(
+      current,
+      finding,
+      'set-valid-option-value',
+      createChangeSet(current),
+      { value: '192.0.2.53, 192.0.2.54' },
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.changeSet.operations[0]).toEqual(expect.objectContaining({
+      kind: 'option.set',
+      targetId: current.configuration.ipv4Scopes[0]!.id,
+      before: expect.objectContaining({ optionId: option.id, value: 'not-an-address' }),
+      after: expect.objectContaining({ code: 6, value: ['192.0.2.53', '192.0.2.54'], level: 'scope' }),
+    }));
+  });
+
+  it('offers both deterministic ways to resolve a scope option override', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const scopeOption = imported.configuration.options.find(({ code }) => code === 6)!;
+    const server = imported.configuration.servers[0]!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      options: [
+        ...imported.configuration.options,
+        { ...scopeOption, id: 'server-dns', level: 'global', scopeId: undefined, value: ['192.0.2.54'], provenance: server.provenance },
+      ],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'scope-option-overrides-server')!;
+
+    expect(listFindingActions(current, finding).map(({ id, mode }) => ({ id, mode }))).toEqual([
+      { id: 'align-option-with-server', mode: 'automatic' },
+      { id: 'remove-scope-option', mode: 'automatic' },
+    ]);
+    const aligned = prepareFindingAction(current, finding, 'align-option-with-server');
+    const removed = prepareFindingAction(current, finding, 'remove-scope-option');
+
+    expect(aligned.valid).toBe(true);
+    expect(aligned.changeSet.operations[0]).toEqual(expect.objectContaining({
+      kind: 'option.set',
+      targetId: current.configuration.ipv4Scopes[0]!.id,
+      after: expect.objectContaining({ value: ['192.0.2.54'] }),
+    }));
+    expect(removed.valid).toBe(true);
+    expect(removed.changeSet.operations[0]).toEqual(expect.objectContaining({ kind: 'option.remove', targetId: scopeOption.id }));
+  });
+
+  it('offers range and lease editors for a capacity finding', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const scope = imported.configuration.ipv4Scopes[0]!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      ipv4Scopes: [{ ...scope, observedLeaseCount: 85 }],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'scope-capacity-low')!;
+
+    expect(listFindingActions(current, finding).map(({ id, mode }) => ({ id, mode }))).toEqual([
+      { id: 'resize-scope-range', mode: 'guided' },
+      { id: 'set-scope-lease', mode: 'guided' },
+    ]);
+    const range = prepareFindingAction(current, finding, 'resize-scope-range', createChangeSet(current), { start: '192.0.2.10', end: '192.0.2.200' });
+    const lease = prepareFindingAction(current, finding, 'set-scope-lease', createChangeSet(current), { leaseSeconds: '14400' });
+
+    expect(range.valid).toBe(true);
+    expect(range.changeSet.operations[0]).toEqual(expect.objectContaining({ kind: 'scope-range.set', after: { start: '192.0.2.10', end: '192.0.2.200' } }));
+    expect(lease.valid).toBe(true);
+    expect(lease.changeSet.operations[0]).toEqual(expect.objectContaining({ kind: 'scope-lease.set', afterSeconds: 14400 }));
+  });
+
+  it('keeps parser and incomplete failover findings analysis-only', () => {
+    const current = workspace(microsoftXml, 'export.xml');
+    for (const ruleId of ['parser-warning', 'failover-scope-membership-missing']) {
+      const finding = current.findings.find((candidate) => candidate.ruleId === ruleId)!;
+      expect(listFindingActions(current, finding)).toEqual([]);
+    }
+  });
+
+  it('does not advertise a reservation update when rollback identity is missing', () => {
+    const imported = workspace(microsoftXml, 'export.xml');
+    const reservation = imported.configuration.reservations[0]!;
+    const current = buildConfigurationWorkspace({
+      ...imported.configuration,
+      reservations: [{ ...reservation, address: '198.51.100.50', identifier: undefined }],
+    });
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'reservation-outside-scope')!;
+
+    expect(listFindingActions(current, finding)).toEqual([]);
   });
 });

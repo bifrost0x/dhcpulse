@@ -30,7 +30,7 @@ The workspace summarizes canonical entities and opens on a bounded overview that
 
 ## Finding-to-change boundary
 
-Workspace findings carry deterministic IDs, typed evidence, confidence, affected object IDs, operational impact and recommendation keys, authoritative sources, and an optional allow-listed action ID. The registry currently builds only single-address exclusions for supported Microsoft reservation and gateway findings. Every operation passes through the existing change-set validator before package eligibility is evaluated.
+Workspace findings carry deterministic IDs, typed evidence, confidence, affected object IDs, operational impact and recommendation keys, and authoritative sources. `finding-actions.ts` maps supported Microsoft findings to either deterministic operations or guided fields whose administrator-supplied values are validated before preview. `inventory-actions.ts` exposes the same closed operation model for supported server, scope, pool, exclusion, reservation, and option objects. Parser warnings, incomplete failover membership, policies, and DHCPv6 stay analysis-only when the imported evidence cannot determine a safe target state. Every operation passes through the change-set validator before package eligibility is evaluated.
 
 Package generation independently requires a Microsoft XML source, a named server, a valid non-empty change set, complete target facts, and no blocker finding on the target scopes. Output contains Preflight, Apply, Verify, Rollback, a change runbook, the immutable change set, and a SHA-256 manifest. No output is executed by the application.
 
