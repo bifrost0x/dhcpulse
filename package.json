@@ -2,6 +2,23 @@
   "name": "dhcpulse",
   "private": true,
   "version": "0.1.0",
+  "description": "Local-first DHCP configuration analysis and guarded change planning for administrators.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bifrost0x/dhcpulse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bifrost0x/dhcpulse/issues"
+  },
+  "homepage": "https://github.com/bifrost0x/dhcpulse#readme",
+  "keywords": [
+    "dhcp",
+    "microsoft-dhcp",
+    "network-administration",
+    "network-security",
+    "ipam"
+  ],
   "type": "module",
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
@@ -13,6 +30,7 @@
     "build": "tsc -b && vite build && node scripts/verify-build.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:ci": "vitest run --coverage",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",

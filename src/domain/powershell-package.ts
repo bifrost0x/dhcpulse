@@ -146,8 +146,8 @@ function operationFragments(configuration: DhcpConfiguration, operation: DhcpCha
       return {
         preflight: [marker, reservationAbsentGuard(operation.after.address)],
         apply: [marker, addReservation(scopeId, operation.after)],
-        verify: [marker, reservationGuard(operation.after)],
-        rollback: [marker, reservationGuard(operation.after), removeReservation(operation.after.address)],
+        verify: [marker, reservationGuard(scopeId, operation.after)],
+        rollback: [marker, reservationGuard(scopeId, operation.after), removeReservation(scopeId, operation.after.clientId)],
         summary: { kind: operation.kind, target: operation.after.address, before: 'absent', after: reservationSummary(operation.after) },
       };
     }
@@ -157,25 +157,25 @@ function operationFragments(configuration: DhcpConfiguration, operation: DhcpCha
       const sameAddress = operation.before.address === operation.after.address;
       const apply = sameAddress
         ? setReservation(operation.before.address, operation.after)
-        : `${removeReservation(operation.before.address)}\n${addReservation(scopeId, operation.after)}`;
+        : `${removeReservation(scopeId, operation.before.clientId)}\n${addReservation(scopeId, operation.after)}`;
       const rollback = sameAddress
         ? setReservation(operation.after.address, operation.before)
-        : `${removeReservation(operation.after.address)}\n${addReservation(scopeId, operation.before)}`;
+        : `${removeReservation(scopeId, operation.after.clientId)}\n${addReservation(scopeId, operation.before)}`;
       return {
-        preflight: [marker, reservationGuard(operation.before), ...(sameAddress ? [] : [reservationAbsentGuard(operation.after.address)])],
+        preflight: [marker, reservationGuard(scopeId, operation.before), ...(sameAddress ? [] : [reservationAbsentGuard(operation.after.address)])],
         apply: [marker, apply],
-        verify: [marker, reservationGuard(operation.after)],
-        rollback: [marker, reservationGuard(operation.after), rollback],
+        verify: [marker, reservationGuard(scopeId, operation.after)],
+        rollback: [marker, reservationGuard(scopeId, operation.after), rollback],
         summary: { kind: operation.kind, target: operation.before.address, before: reservationSummary(operation.before), after: reservationSummary(operation.after) },
       };
     }
     case 'reservation.remove': {
       const scopeId = scopeAddress(requiredScope(configuration, configuration.reservations.find(({ id }) => id === operation.targetId)?.scopeId));
       return {
-        preflight: [marker, reservationGuard(operation.before)],
-        apply: [marker, removeReservation(operation.before.address)],
-        verify: [marker, reservationAbsentGuard(operation.before.address)],
-        rollback: [marker, reservationAbsentGuard(operation.before.address), addReservation(scopeId, operation.before)],
+        preflight: [marker, reservationGuard(scopeId, operation.before)],
+        apply: [marker, removeReservation(scopeId, operation.before.clientId)],
+        verify: [marker, reservationIdentityAbsentGuard(scopeId, operation.before.clientId)],
+        rollback: [marker, reservationIdentityAbsentGuard(scopeId, operation.before.clientId), addReservation(scopeId, operation.before)],
         summary: { kind: operation.kind, target: operation.before.address, before: reservationSummary(operation.before), after: 'absent' },
       };
     }
@@ -296,12 +296,16 @@ function removeExclusion(scopeId: string, start: string, end: string): string {
   return `Remove-DhcpServerv4ExclusionRange -ComputerName $Server -ScopeId ${q(scopeId)} -StartRange ${q(start)} -EndRange ${q(end)}`;
 }
 
-function reservationGuard(state: ReservationState): string {
-  return `$Reservation = Get-DhcpServerv4Reservation -ComputerName $Server -IPAddress ${q(state.address)} -ErrorAction Stop\nif ($Reservation.ClientId -ne ${q(state.clientId)} -or [string]$Reservation.Name -ne ${q(state.hostname ?? '')}) { throw ${q(`Reservation ${state.address} differs from the expected state.`)} }`;
+function reservationGuard(scopeId: string, state: ReservationState): string {
+  return `$Reservation = @(Get-DhcpServerv4Reservation -ComputerName $Server -ScopeId ${q(scopeId)} -ClientId ${q(state.clientId)} -ErrorAction Stop)\nif ($Reservation.Count -ne 1 -or $Reservation[0].IPAddress.IPAddressToString -ne ${q(state.address)} -or [string]$Reservation[0].Name -ne ${q(state.hostname ?? '')}) { throw ${q(`Reservation ${state.address} differs from the expected state.`)} }`;
 }
 
 function reservationAbsentGuard(address: string): string {
   return `$Reservation = Get-DhcpServerv4Reservation -ComputerName $Server -IPAddress ${q(address)} -ErrorAction SilentlyContinue\nif ($null -ne $Reservation) { throw ${q(`Reservation ${address} already exists.`)} }`;
+}
+
+function reservationIdentityAbsentGuard(scopeId: string, clientId: string): string {
+  return `$Reservation = @(Get-DhcpServerv4Reservation -ComputerName $Server -ScopeId ${q(scopeId)} -ClientId ${q(clientId)} -ErrorAction SilentlyContinue)\nif ($Reservation.Count -ne 0) { throw ${q(`Reservation client ${clientId} already exists in scope ${scopeId}.`)} }`;
 }
 
 function addReservation(scopeId: string, state: ReservationState): string {
@@ -312,8 +316,8 @@ function setReservation(address: string, state: ReservationState): string {
   return `Set-DhcpServerv4Reservation -ComputerName $Server -IPAddress ${q(address)} -ClientId ${q(state.clientId)} -Name ${q(state.hostname ?? '')}`;
 }
 
-function removeReservation(address: string): string {
-  return `Remove-DhcpServerv4Reservation -ComputerName $Server -IPAddress ${q(address)} -Confirm:$false`;
+function removeReservation(scopeId: string, clientId: string): string {
+  return `Remove-DhcpServerv4Reservation -ComputerName $Server -ScopeId ${q(scopeId)} -ClientId ${q(clientId)} -Confirm:$false`;
 }
 
 function optionGuard(state: OptionState, scopeId: string | undefined): string {

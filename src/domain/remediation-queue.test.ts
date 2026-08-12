@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import largeMicrosoftXml from '../../samples/microsoft-dhcp-realistic-large.xml?raw';
+import microsoftXml from '../test/fixtures/microsoft-dhcp.xml?raw';
 import { importDhcpConfiguration } from './config-import';
 import { buildConfigurationWorkspace } from './config-workspace';
 import { addChangeOperation, createChangeSet } from './dhcp-change-set';
@@ -119,5 +120,27 @@ describe('remediation queue', () => {
     expect(summarizeTargetRisk(workspace, result).blockerRules).toContainEqual({
       ruleId: 'duplicate-reservation-identifier', count: 1,
     });
+  });
+
+  it('summarizes target risk from the validated preview instead of resolved imported findings', () => {
+    const imported = importDhcpConfiguration({ text: microsoftXml, format: 'microsoft-xml' }).configuration;
+    const reservation = imported.reservations[0]!;
+    const workspace = buildConfigurationWorkspace({
+      ...imported,
+      reservations: [{ ...reservation, address: '198.51.100.50' }],
+    });
+    const finding = workspace.findings.find(({ ruleId }) => ruleId === 'reservation-outside-scope')!;
+    const result = prepareFindingAction(
+      workspace,
+      finding,
+      'update-reservation-address',
+      createChangeSet(workspace),
+      { address: '192.0.2.60' },
+    );
+
+    expect(result.valid).toBe(true);
+    expect(summarizeTargetRisk(workspace, result).blockerRules).not.toContainEqual(
+      expect.objectContaining({ ruleId: 'reservation-outside-scope' }),
+    );
   });
 });

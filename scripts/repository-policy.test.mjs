@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   findForbiddenPaths,
+  findMutableReleaseDownloads,
   findUnpinnedActionReferences,
   findUnpinnedDockerImages,
 } from './repository-policy.mjs';
@@ -94,5 +95,16 @@ FROM nginx:1.31@sha256:${'a'.repeat(64)}
 FROM scratch
 `),
     ).toEqual(['line 1 node:24-alpine']);
+  });
+
+  it('rejects mutable latest-release downloads in workflows', () => {
+    expect(findMutableReleaseDownloads([{
+      path: '.github/workflows/security.yml',
+      content: `run: curl -L https://github.com/tool/project/releases/latest/download/tool.tar.gz
+run: curl -L https://github.com/tool/project/releases/download/v1.2.3/tool.tar.gz
+`,
+    }])).toEqual([
+      '.github/workflows/security.yml:1 run: curl -L https://github.com/tool/project/releases/latest/download/tool.tar.gz',
+    ]);
   });
 });
