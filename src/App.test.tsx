@@ -442,11 +442,15 @@ describe('DHCPulse Workbench', () => {
     await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
     await user.click(screen.getByRole('tab', { name: /Inventory/ }));
 
+    const objectResults = screen.getByRole('region', { name: 'Object results' });
+    expect(objectResults).toBeVisible();
+    expect(within(objectResults).getAllByRole('button').length).toBeGreaterThan(0);
+
     const reservations = screen.getByRole('button', { name: 'Show Reservation objects (300)' });
     await user.click(reservations);
 
     expect(reservations).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('100+ results')).toBeVisible();
+    expect(within(objectResults).getByText('100+')).toBeVisible();
     expect(screen.getByRole('button', { name: /device-001\.lab\.example/ })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'device-001.lab.example' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'device-001.lab.example' })).toHaveFocus();
@@ -455,7 +459,7 @@ describe('DHCPulse Workbench', () => {
     await user.click(screen.getByRole('button', { name: 'Show all object types (410)' }));
     expect(screen.getByRole('heading', { name: 'Object inventory' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Select an object' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: /device-001\.lab\.example/ })).not.toBeInTheDocument();
+    expect(within(objectResults).getAllByRole('button').length).toBeGreaterThan(0);
   });
 
   it('localizes the complete shared finding explanation in German', async () => {

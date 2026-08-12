@@ -190,8 +190,7 @@ function Objects({ locale, workspace, selected, onSelect }: { locale: Locale; wo
   const pendingDetailFocus = useRef(false);
   const normalized = query.trim().toLocaleLowerCase();
   const filtered = workspace.nodes.filter((node) => (kind === 'all' || node.kind === kind) && (!normalized || node.searchableText.includes(normalized)));
-  const showResults = Boolean(normalized) || kind !== 'all';
-  const results = showResults ? filtered.slice(0, 100) : [];
+  const results = filtered.slice(0, 100);
   const counts = workspace.nodes.reduce<Record<string, number>>((current, node) => ({ ...current, [node.kind]: (current[node.kind] ?? 0) + 1 }), {});
   const searchLabel = locale === 'de' ? 'Konfigurationsobjekte durchsuchen' : 'Search configuration objects';
   useEffect(() => {
@@ -211,14 +210,20 @@ function Objects({ locale, workspace, selected, onSelect }: { locale: Locale; wo
     onSelect(firstId);
   }
   return <div className="workspace-object-product">
-    <section className="planner-card workspace-object-index">
-      <label className="workspace-search"><Search size={18} aria-hidden="true" /><span className="visually-hidden">{searchLabel}</span><input type="search" aria-label={searchLabel} placeholder={locale === 'de' ? 'Name, Adresse, Netz, Option oder Client-ID' : 'Name, address, network, option, or client ID'} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-      <h2>{locale === 'de' ? 'Objektbestand' : 'Object inventory'}</h2><p>{locale === 'de' ? 'Nach Typ filtern oder gezielt suchen. Maximal 100 Objekte werden gleichzeitig angezeigt.' : 'Filter by type or search intentionally. At most 100 objects are shown at once.'}</p>
+    <section className="planner-card workspace-object-filter-rail">
+      <span className="section-kicker">{locale === 'de' ? 'Bestand filtern' : 'Filter inventory'}</span>
+      <h2>{locale === 'de' ? 'Objekttypen' : 'Object types'}</h2>
+      <p>{locale === 'de' ? 'Wähle eine Kategorie, um die zugehörigen Objekte direkt anzuzeigen.' : 'Choose a category to show its objects immediately.'}</p>
       <div className="workspace-object-counts" role="group" aria-label={locale === 'de' ? 'Objekttyp filtern' : 'Filter by object type'}>
         <button type="button" aria-pressed={kind === 'all'} aria-label={locale === 'de' ? `Alle Objekttypen anzeigen (${workspace.nodes.length})` : `Show all object types (${workspace.nodes.length})`} onClick={() => selectKind('all')}><span>{locale === 'de' ? 'Alle Typen' : 'All types'}</span><b>{workspace.nodes.length}</b></button>
         {Object.entries(counts).map(([entryKind, count]) => { const label = workspaceKindLabel(entryKind as ConfigurationWorkspace['nodes'][number]['kind'], locale); return <button type="button" key={entryKind} aria-pressed={kind === entryKind} aria-label={locale === 'de' ? `Objekte vom Typ ${label} anzeigen (${count})` : `Show ${label} objects (${count})`} onClick={() => selectKind(entryKind as ConfigurationWorkspace['nodes'][number]['kind'])}><span>{label}</span><b>{count}</b></button>; })}
       </div>
-      {showResults && <><p className="workspace-result-count">{filtered.length > 100 ? '100+' : filtered.length} {locale === 'de' ? 'Treffer' : 'results'}</p>{results.length ? <ul className="workspace-object-results">{results.map((node) => <li key={node.id}><button type="button" className={selected?.id === node.id ? 'active' : ''} onClick={() => selectObject(node.id)}><strong>{node.label}</strong>{node.secondary && <span>{node.secondary}</span>}<small>{workspaceKindLabel(node.kind, locale)}</small></button></li>)}</ul> : <p>{locale === 'de' ? 'Keine passenden Objekte.' : 'No matching objects.'}</p>}</>}
+    </section>
+    <section className="planner-card workspace-object-list-pane" aria-label={locale === 'de' ? 'Objektergebnisse' : 'Object results'}>
+      <label className="workspace-search"><Search size={18} aria-hidden="true" /><span className="visually-hidden">{searchLabel}</span><input type="search" aria-label={searchLabel} placeholder={locale === 'de' ? 'Name, Adresse, Netz, Option oder Client-ID' : 'Name, address, network, option, or client ID'} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+      <header><div><span className="section-kicker">{locale === 'de' ? 'Ergebnisse' : 'Results'}</span><h2>{locale === 'de' ? 'Objektbestand' : 'Object inventory'}</h2></div><strong>{filtered.length > 100 ? '100+' : filtered.length}</strong></header>
+      <p>{locale === 'de' ? 'Maximal 100 Objekte werden gleichzeitig angezeigt.' : 'At most 100 objects are shown at once.'}</p>
+      {results.length ? <ul className="workspace-object-results">{results.map((node) => <li key={node.id}><button type="button" className={selected?.id === node.id ? 'active' : ''} onClick={() => selectObject(node.id)}><strong>{node.label}</strong>{node.secondary && <span>{node.secondary}</span>}<small>{workspaceKindLabel(node.kind, locale)}</small></button></li>)}</ul> : <p className="workspace-object-empty">{locale === 'de' ? 'Keine passenden Objekte.' : 'No matching objects.'}</p>}
     </section>
     {selected ? <WorkspaceObjectView locale={locale} workspace={workspace} selected={selected} headingRef={detailHeadingRef} /> : <Message title={locale === 'de' ? 'Objekt auswählen' : 'Select an object'} text={locale === 'de' ? 'Suche nach einem Objekt und öffne es für Details und Provenienz.' : 'Search for an object and open it for details and provenance.'} />}
   </div>;
