@@ -15,6 +15,8 @@ describe('repository policy', () => {
 
     expect(containerJob).toBeDefined();
     expect(containerJob).toMatch(/^ {4}needs: static-artifacts$/m);
+    expect(workflow).toContain(`jq --raw-output '.["containerimage.digest"]' build-metadata.json`);
+    expect(workflow).not.toContain(`jq --raw-output '.\\"containerimage.digest\\"' build-metadata.json`);
   });
 
   it('publishes unique security check names for branch rules', async () => {

@@ -118,7 +118,7 @@ jobs:
             --provenance=mode=max \
             --metadata-file build-metadata.json \
             --push .
-          digest="$(jq --raw-output '.\"containerimage.digest\"' build-metadata.json)"
+          digest="$(jq --raw-output '.["containerimage.digest"]' build-metadata.json)"
           test "$digest" != "null"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Attest native image
