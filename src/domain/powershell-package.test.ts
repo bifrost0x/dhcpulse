@@ -99,6 +99,44 @@ describe('PowerShell change package', () => {
     expect(artifactContent(pkg.artifacts, 'CHANGE.md')).toContain('Betriebsdaten - vor Weitergabe prüfen');
   });
 
+  it('targets one duplicate reservation by scope and client identity in every generated phase', async () => {
+    const { configuration } = setup();
+    const original = configuration.reservations[0]!;
+    const duplicate = {
+      ...original,
+      id: 'duplicate-reservation',
+      identifier: '02:00:5e:10:00:99',
+      hostname: 'duplicate.example.com',
+    };
+    const workspace = buildMicrosoftWorkspace({
+      ...configuration,
+      reservations: [original, duplicate],
+    });
+    const result = addChangeOperation(workspace, createChangeSet(workspace), {
+      id: 'remove-duplicate',
+      kind: 'reservation.remove',
+      targetId: duplicate.id,
+      before: {
+        address: duplicate.address,
+        clientId: duplicate.identifier,
+        hostname: duplicate.hostname,
+      },
+    });
+
+    const pkg = await generatePowerShellPackage(workspace, result, 'en', new Date('2026-08-12T10:00:00.000Z'));
+    const preflight = artifactContent(pkg.artifacts, '01-Preflight.ps1');
+    const apply = artifactContent(pkg.artifacts, '02-Apply.ps1');
+    const verify = artifactContent(pkg.artifacts, '03-Verify.ps1');
+    const rollback = artifactContent(pkg.artifacts, '04-Rollback.ps1');
+
+    for (const script of [preflight, apply, verify, rollback]) {
+      expect(script).toContain("-ScopeId '192.0.2.0'");
+      expect(script).toContain("-ClientId '02:00:5e:10:00:99'");
+    }
+    expect(apply).toContain("Remove-DhcpServerv4Reservation -ComputerName $Server -ScopeId '192.0.2.0' -ClientId '02:00:5e:10:00:99' -Confirm:$false");
+    expect(apply).not.toContain("Remove-DhcpServerv4Reservation -ComputerName $Server -IPAddress '192.0.2.50'");
+  });
+
   it('orders dependent removals before a range shrink and reverses that order for rollback', async () => {
     const { configuration, workspace } = setup();
     const scope = configuration.ipv4Scopes[0]!;

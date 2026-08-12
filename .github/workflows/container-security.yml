@@ -1,0 +1,51 @@
+name: Container security
+
+on:
+  push:
+    branches: [main, "dev/**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: container-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  HADOLINT_VERSION: 2.15.1
+  HADOLINT_SHA256: c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507
+  TRIVY_VERSION: 0.73.0
+  TRIVY_SHA256: 2edd39da482bb4e9831962487b68f68e3928ec3137794757f54d00383d79547b
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verified scanners
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location \
+            --output /tmp/hadolint \
+            "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64"
+          echo "${HADOLINT_SHA256}  /tmp/hadolint" | sha256sum --check --strict
+          chmod 0755 /tmp/hadolint
+          curl --fail --silent --show-error --location \
+            --output /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  /tmp/trivy.tar.gz" | sha256sum --check --strict
+          tar --extract --gzip --file /tmp/trivy.tar.gz --directory /tmp trivy
+          chmod 0755 /tmp/trivy
+      - name: Lint container definition
+        run: /tmp/hadolint Dockerfile
+      - name: Scan infrastructure configuration
+        run: /tmp/trivy config --exit-code 1 --severity HIGH,CRITICAL --disable-telemetry --skip-check-update --skip-version-check .
+      - name: Build production image
+        run: docker build --tag dhcpulse:ci .
+      - name: Scan production image
+        run: /tmp/trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --disable-telemetry --skip-version-check dhcpulse:ci

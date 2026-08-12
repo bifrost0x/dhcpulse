@@ -8,7 +8,7 @@ Describe the user-visible or operational change and why it is needed.
 - [ ] `npm run audit:dependencies`
 - [ ] `npm run lint`
 - [ ] `npm run typecheck`
-- [ ] `npm test`
+- [ ] `npm run test:ci`
 - [ ] `npm run build`
 
 ## Safety and privacy
@@ -16,3 +16,4 @@ Describe the user-visible or operational change and why it is needed.
 - [ ] No real customer configuration, lease data, addresses, client identifiers, credentials, or secrets are included.
 - [ ] User-visible changes are complete in English and German.
 - [ ] The browser-only privacy boundary remains intact.
+- [ ] Generated changes, parser limits, documentation, and release metadata were updated where applicable.

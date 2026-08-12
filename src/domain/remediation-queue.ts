@@ -1,6 +1,7 @@
 import type { ChangeSetResult } from './dhcp-change-set';
 import { listFindingActions } from './finding-actions';
 import type { ConfigurationWorkspace, WorkspaceFinding } from './config-workspace';
+import { buildMicrosoftWorkspace } from './microsoft-workspace';
 import { evaluatePackageEligibility, groupWorkspaceFindings } from './workspace-view';
 
 export type RemediationSection = 'act-now' | 'review' | 'observe';
@@ -165,13 +166,14 @@ export function summarizeTargetRisk(
   result: ChangeSetResult,
 ): TargetRiskSummary {
   const { targetScopeIds, newScopes } = evaluatePackageEligibility(workspace, result);
-  const relevant = groupWorkspaceFindings(workspace)
+  const previewWorkspace = buildMicrosoftWorkspace(result.preview);
+  const relevant = groupWorkspaceFindings(previewWorkspace)
     .filter(({ scopeIds }) => scopeIds.some((id) => targetScopeIds.includes(id)));
   const rules = (severity: WorkspaceFinding['severity']) => relevant
     .filter((group) => group.severity === severity)
     .map(({ ruleId, findings }) => ({
       ruleId,
-      count: findings.filter((finding) => findingScopeIds(workspace, finding)
+      count: findings.filter((finding) => findingScopeIds(previewWorkspace, finding)
         .some((scopeId) => targetScopeIds.includes(scopeId))).length,
     }))
     .filter(({ count }) => count > 0);
@@ -188,7 +190,7 @@ function findScopeId(workspace: ConfigurationWorkspace, finding: WorkspaceFindin
   return findingScopeIds(workspace, finding)[0];
 }
 
-function findingScopeIds(workspace: ConfigurationWorkspace, finding: WorkspaceFinding): string[] {
+function findingScopeIds(workspace: Pick<ConfigurationWorkspace, 'configuration'>, finding: WorkspaceFinding): string[] {
   const ids = new Set(workspace.configuration.ipv4Scopes
     .filter(({ id }) => finding.entityIds.includes(id))
     .map(({ id }) => id));

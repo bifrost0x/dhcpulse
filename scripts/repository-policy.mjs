@@ -103,3 +103,18 @@ export function findUnpinnedDockerImages(dockerfile) {
 
   return findings;
 }
+
+export function findMutableReleaseDownloads(workflows) {
+  const findings = [];
+
+  for (const workflow of workflows) {
+    const lines = workflow.content.split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      if (/https?:\/\/[^\s"']+\/(?:latest|releases\/latest)(?:[\s/"']|$)/i.test(line)) {
+        findings.push(`${workflow.path}:${index + 1} ${line.trim()}`);
+      }
+    }
+  }
+
+  return findings;
+}

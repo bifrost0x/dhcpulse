@@ -2,11 +2,17 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest release on the default branch.
+Security fixes are applied to the latest release and the default branch. Older pre-release snapshots and modified third-party deployments are not maintained.
+
+| Version | Supported |
+| --- | --- |
+| Latest release | Yes |
+| `main` | Yes |
+| Older releases | No |
 
 ## Reporting a vulnerability
 
-Do not publish a suspected vulnerability in a public issue. Use GitHub's private vulnerability reporting feature in the Security tab of this repository. If private reporting is unavailable, contact the repository owner through an established private channel first.
+Do not publish a suspected vulnerability in a public issue. Use GitHub's private vulnerability reporting feature in the Security tab of this repository. If private reporting is not yet available, contact the repository owner through an established private channel before sharing details.
 
 Include the affected release or commit, reproduction steps using synthetic data, impact, and any suggested mitigation. Never include real customer configurations, lease databases, hostnames, addresses, client identifiers, credentials, or secrets in a report.
 
@@ -28,7 +34,7 @@ Microsoft XML containing `DOCTYPE` or `ENTITY` declarations is rejected before `
 
 ### Memory exhaustion
 
-Each pasted input and selected file is limited to 2 MiB of UTF-8 data. Kea object traversal is limited to 20,000 nodes and 64 levels; the ISC tokenizer and parser also enforce complexity and depth bounds. Parsing, normalization, comparison, and rendering still consume browser memory, and a crafted input within those limits can cause a slow or unresponsive tab. Close the tab if processing becomes abnormal.
+Each pasted input and selected file is limited to 2 MiB of UTF-8 data. Microsoft XML and Kea object traversal are limited to 20,000 nodes and 64 levels; the ISC tokenizer and parser also enforce complexity and depth bounds. Parsing, normalization, comparison, and rendering still consume browser memory, and a crafted input within those limits can cause a slow or unresponsive tab. Close the tab if processing becomes abnormal.
 
 ### Secret exposure
 
@@ -39,3 +45,7 @@ Use synthetic samples for reports and bug submissions whenever possible. Inspect
 ## Limitations
 
 DHCPulse findings are planning and review assistance. They do not prove that a configuration is valid, secure, deployable, or equivalent across vendors. The application does not perform live reachability checks, vendor schema validation, packet-level simulation, authorization checks, or laboratory testing. Validate material changes with vendor tools, authoritative documentation, backups, and a controlled test environment.
+
+## Supply-chain controls
+
+GitHub Actions are pinned to full commit SHAs, Docker base images are pinned to immutable digests, and release artifacts include checksums, an SBOM, and GitHub attestations. CI performs dependency audit, coverage, production-build, repository-policy, CodeQL, Dockerfile, infrastructure, and image vulnerability checks where the repository feature is available. These controls reduce risk but do not guarantee that dependencies, build infrastructure, or published artifacts are vulnerability-free.

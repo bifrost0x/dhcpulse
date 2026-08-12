@@ -1,120 +1,121 @@
 # DHCPulse
 
-DHCPulse is a static, local-only configuration workspace for understanding DHCP environments and preparing safer changes. Open a Microsoft DHCP XML, Kea JSON, ISC `dhcpd.conf`, or dnsmasq configuration to get one normalized overview, prioritized findings, and a searchable object inventory. Supported Microsoft findings can be turned into validated Preflight, Apply, Verify, and Rollback PowerShell artifacts.
+[![CI](https://github.com/bifrost0x/dhcpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/bifrost0x/dhcpulse/actions/workflows/ci.yml)
+[![Container security](https://github.com/bifrost0x/dhcpulse/actions/workflows/container-security.yml/badge.svg)](https://github.com/bifrost0x/dhcpulse/actions/workflows/container-security.yml)
+[![Secret scan](https://github.com/bifrost0x/dhcpulse/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/bifrost0x/dhcpulse/actions/workflows/secret-scan.yml)
+[![CodeQL](https://github.com/bifrost0x/dhcpulse/actions/workflows/codeql.yml/badge.svg)](https://github.com/bifrost0x/dhcpulse/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
 
-It is useful when you need an explainable second opinion without sending production configuration to an application backend. DHCPulse is not a DHCP server, IPAM/DDI system, live monitor, active scanner, packet generator, or substitute for vendor validation and lab testing.
+DHCPulse is a local-first DHCP configuration workspace for administrators and security consultants. It turns supported configuration exports into a normalized inventory, prioritized and explainable findings, validated change previews, and guarded Microsoft DHCP PowerShell packages.
 
-## Primary workflow
+No configuration is uploaded. The production application is static, has no backend, storage, analytics, or telemetry, and ships with a Content Security Policy that blocks application network connections.
 
-1. Open a local configuration or the bundled realistic Microsoft example.
-2. Start on **Overview**, which explains the import result, the product boundary, and the four-step review flow.
-3. Open **Review issues** and work through **Act now**, **Review**, and **Observe**. Filter by scope, severity, actionability, or rule, then inspect evidence, provenance, related objects, and repeated occurrences.
-4. For supported Microsoft XML issues, choose a deterministic fix or enter the missing target value in a guided editor. Scopes, pools, exclusions, reservations, options, and server options can also prepare allow-listed changes directly from **Inventory**. Every change is previewed before it can enter the local **Change plan**.
-5. Review exact scope, rationale, before/after state, and validation before opening **Export**. The export view explains missing prerequisites instead of presenting an inactive action.
-6. Generate, download, and inspect the guarded package. DHCPulse never connects to or changes the server.
+## What it does
 
-Kea, ISC dhcpd, and dnsmasq receive the same analysis and object workflow. Executable changes remain Microsoft-only because their package generation is bound to the typed Microsoft DHCP PowerShell model and validated source facts.
+- Imports Microsoft DHCP XML, Kea JSON, ISC `dhcpd.conf`, and dnsmasq configuration.
+- Builds a bounded, searchable inventory of scopes, pools, exclusions, reservations, options, policies, relays, failover relationships, and DHCPv6 objects.
+- Groups findings into an operational remediation queue with evidence, confidence, impact, sources, and affected objects.
+- Lets administrators prepare allow-listed Microsoft DHCP changes from supported findings and inventory objects.
+- Validates the complete change set and previews its resulting configuration before export.
+- Generates separate Preflight, Apply, Verify, and Rollback PowerShell scripts plus a change record, immutable change set, and SHA-256 manifest.
+- Includes specialist utilities for scope capacity, lease transitions, options, PXE, failover, DHCPv6, diagnostics, security review, and semantic configuration comparison.
 
-## Specialist utilities
+DHCPulse does not run scripts, connect to DHCP servers, scan networks, provide DHCP service, replace IPAM/DDI, or claim complete vendor validation.
 
-| Tool | Practical use |
-| --- | --- |
-| Scope and capacity | Design IPv4 pools, exclusions, reservations, and capacity margins. |
-| Lease transition | Model T1, T2, expiry, client waves, cutover risks, and rollback steps. |
-| DHCP options | Find, encode, decode, and validate common DHCPv4 and DHCPv6 options. |
-| PXE boot | Review architecture matching, boot settings, ProxyDHCP risks, and vendor-specific example snippets. |
-| Failover design | Assess Windows DHCP failover mode, timers, capacity, readiness, and validation steps. |
-| DHCPv6 | Review RA flags, address and prefix lifetimes, relay evidence, DUID/IAID assumptions, and delegated-prefix capacity. |
-| Diagnostics | Rank likely causes from entered symptoms and evidence, then provide targeted checks and sources. |
-| DHCP security | Review control evidence for infrastructure, service, network, and operational safeguards. |
-| Configuration comparison | Normalize two supported configurations and report redacted semantic additions, removals, changes, and migration impacts. |
+## Start in two minutes
 
-All tools run in the browser. Reports are assembled locally and downloaded through a temporary object URL. Imported-configuration reports are redacted by default.
-
-The configuration workspace does not dump a large environment into the page. Its overview explains what was imported and directs the operator into one progressive flow: **Overview → Review issues → Inventory → Change plan → Export**. The issue queue groups findings by rule, ranks operational work, keeps occurrence and scope context visible, and limits every section to 50 rule groups. Repeated occurrences remain navigable, while objects load through a bounded search. Supported Microsoft findings expose deterministic or guided changes; supported inventory objects expose the same validated change path without requiring a finding first. Ambiguous parser and failover evidence remains analysis-only instead of producing guessed configuration. Import coverage, expert analysis, and package readiness remain separate. Before acknowledgement, package readiness lists exact target scopes and grouped blocker and warning rules. Generated change packages contain real infrastructure values, execute nothing automatically, and must be reviewed and tested before use. The package includes a human-readable change record, the immutable change set, and a SHA-256 manifest alongside the four PowerShell phases.
-
-A large, entirely synthetic Microsoft export is available in [`samples/`](samples/) for regression and upload testing.
-
-## Configuration imports
-
-The primary workspace accepts local files in these formats; the comparison utility also accepts pasted text:
-
-- Microsoft DHCP Server XML exports
-- Kea JSON, including the supported comment forms
-- ISC `dhcpd.conf`
-- dnsmasq DHCP directives
-
-Auto-detection uses recognizable content and selected file-name extensions. Each file or pasted input is limited to 2 MiB of UTF-8 data. Microsoft XML containing `DOCTYPE` or `ENTITY` declarations is rejected.
-
-The adapters intentionally parse a bounded analysis subset. Unsupported elements, keys, directives, statements, and expression-language details can be omitted and are reported as parser warnings where detected. They do not execute includes, expand every vendor extension, reproduce configuration precedence in full, or guarantee complete schema fidelity. Always compare findings with the source configuration and vendor tooling.
-
-Configuration files can contain sensitive infrastructure data, including addresses, hostnames, client identifiers, topology labels, audit paths, and embedded option values. Local processing prevents application uploads, but it does not make that data non-sensitive. Use a trusted browser and host, keep downloaded reports under appropriate access control, and inspect redaction before sharing.
-
-Use **Open another configuration** to discard the active workspace. Leaving a utility resets its isolated state; reloading or closing the tab discards all application state. DHCPulse does not persist projects or imports.
-
-## Privacy and security boundary
-
-DHCPulse is a static application with no application backend, accounts, storage, analytics, telemetry, or application network connections. Scenario and imported configuration data stay in the current browser tab. The production Content Security Policy sets `connect-src 'none'`.
-
-External documentation and source links open only after the user activates them. A hosting provider can still process ordinary web-server request metadata. Read [PRIVACY.md](PRIVACY.md) for the exact data boundary and [SECURITY.md](SECURITY.md) for the parser threat model and disclosure process.
-
-## Local development
-
-Requirements: Node.js 22.13 or newer.
+Requirements: Node.js matching the supported engine range in `package.json` (22.22.2+, 24.15.0+, or 26+).
 
 ```bash
+git clone https://github.com/bifrost0x/dhcpulse.git
+cd dhcpulse
 npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite.
+Open the URL printed by Vite, select **Open a configuration**, and use either your export or the fully synthetic sample in [`samples/`](samples/).
 
-## Testing
+The main workflow is:
 
-```bash
-npm run check:repo
-npm audit --audit-level=high
-npm run lint
-npm run typecheck
-npm test
-npm run build
-```
+1. **Overview** - confirm the detected format, coverage, limits, and next action.
+2. **Review issues** - inspect prioritized findings and their evidence.
+3. **Inventory** - search real objects and prepare supported object-level changes.
+4. **Change plan** - review exact targets, rationale, before/after state, validation, and package risk.
+5. **Export** - generate guarded artifacts only after all prerequisites and warnings are acknowledged.
 
-The build step also checks the production CSP and rejects JavaScript assets containing fetch, XHR, WebSocket, EventSource, or beacon primitives.
+The application includes an export guide beside the file picker. Detailed operator instructions are in [Getting started](docs/getting-started.md).
 
-## Run with Docker Compose
+## Supported inputs
+
+| Source | Input | Analysis | Guarded changes |
+| --- | --- | --- | --- |
+| Microsoft DHCP Server | XML from `Export-DhcpServer` | Yes | Supported allow-listed operations |
+| Kea DHCP | JSON configuration | Yes | Analysis only |
+| ISC DHCP | `dhcpd.conf` | Yes | Analysis only |
+| dnsmasq | DHCP directives | Yes | Analysis only |
+
+Every adapter intentionally implements a bounded analysis subset. Inputs are limited to 2 MiB, structural complexity is bounded, unsupported syntax can be omitted with parser warnings, and includes are not executed. See [Configuration imports](docs/configuration-imports.md).
+
+## Privacy and safety boundary
+
+Configuration data remains in the current browser tab. DHCPulse implements no file upload, account, database, cookies, local storage, IndexedDB, service worker cache, or application API calls. Downloads are created locally from in-memory `Blob` objects.
+
+Configuration exports and generated packages remain sensitive operational data. Local processing prevents application uploads, but it does not make addresses, hostnames, client identifiers, topology names, or downloaded scripts safe to share. Read [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) before using production data.
+
+## Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-The container runs unprivileged on port 8080 with a read-only root filesystem, dropped capabilities, `no-new-privileges`, and restrictive response headers. Set `DHCPULSE_PORT` to publish a different host port.
+The container listens on port 8080 and runs as an unprivileged user with a read-only root filesystem, dropped capabilities, `no-new-privileges`, bounded temporary filesystems, a health check, and restrictive response headers. Set `DHCPULSE_PORT` to publish another host port.
 
-## Static hosting
+Deployment and reverse-proxy requirements are documented in [Deployment](docs/deployment.md).
+
+## Development and verification
 
 ```bash
 npm ci
+npm run check:repo
+npm run audit:dependencies
+npm run lint
+npm run typecheck
+npm run test:ci
 npm run build
 ```
 
-Publish the contents of `dist/`. Relative asset paths support a domain root or repository subpath. Preserve the CSP and other security headers when configuring the host; see [PRIVACY.md](PRIVACY.md) before changing the build or hosting model.
+The repository check rejects internal planning artifacts, local tool state, common credential files, mutable GitHub Action references, and Docker base images without immutable digests. Coverage thresholds are enforced in CI. The production build verifier checks the effective CSP and rejects compiled network primitives.
 
-## Authoritative references
+## Releases
 
-DHCPulse links findings to the relevant source in each tool. Core references include:
+Tagged releases publish:
 
-- [RFC 2131 - Dynamic Host Configuration Protocol](https://www.rfc-editor.org/rfc/rfc2131.html)
-- [IANA BOOTP/DHCP Parameters](https://www.iana.org/assignments/bootp-dhcp-parameters/)
-- [RFC 9915 - Dynamic Host Configuration Protocol for IPv6](https://www.rfc-editor.org/rfc/rfc9915.html)
-- [Microsoft DHCP documentation](https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-top)
-- [Kea Administrator Reference Manual](https://kea.readthedocs.io/en/latest/arm/config.html)
-- [ISC DHCP configuration reference](https://kb.isc.org/docs/isc-dhcp-44-manual-pages-dhcpdconf)
-- [dnsmasq manual](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)
+- versioned static ZIP and tar.gz archives;
+- SHA-256 checksums and a CycloneDX SBOM;
+- signed GitHub artifact attestations;
+- a native `linux/amd64` and `linux/arm64` image at `ghcr.io/bifrost0x/dhcpulse` with build provenance and SBOM metadata.
+
+Verification commands are in [Release verification](docs/release-verification.md). Releases are not a substitute for reviewing generated change packages and testing them in a controlled environment.
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Configuration imports](docs/configuration-imports.md)
+- [Microsoft change packages](docs/microsoft-change-packages.md)
+- [Deployment](docs/deployment.md)
+- [Release verification](docs/release-verification.md)
+- [Maintainer release procedure](docs/maintainers/releasing.md)
+- [Architecture](docs/architecture/initial-release.md)
+- [Privacy](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a focused change. Report security concerns through the private process in [SECURITY.md](SECURITY.md). Usage questions belong in GitHub Discussions; [SUPPORT.md](SUPPORT.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) describe the project boundaries.
+Focused, evidence-backed contributions are welcome. Use synthetic data, preserve the browser-only privacy boundary, and add behavioral tests for domain changes. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) first.
 
 ## License
 
-[MIT](LICENSE)
+DHCPulse is available under the [MIT License](LICENSE).

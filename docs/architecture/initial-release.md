@@ -68,3 +68,9 @@ Operators who change the build, proxy, CDN, or host must re-establish the privac
 - Repository policy tests reject forbidden tracked paths, mutable GitHub Action references, and unpinned Docker base images.
 - The production build verifier checks the CSP, relative asset paths, emitted JavaScript presence, and absence of fetch, XHR, WebSocket, EventSource, and beacon primitives.
 - Manual browser, accessibility, and deployment checks remain release-operator responsibilities and are not implied by automated results.
+
+## Release supply chain
+
+CI verifies the supported minimum Node.js line and the current build line, enforces coverage thresholds, and validates workflow syntax. Public pull requests also receive dependency review and CodeQL analysis. Container gates use checksum-verified scanner binaries, lint the Dockerfile, scan infrastructure configuration, build the production image, and reject fixable High or Critical image vulnerabilities.
+
+Version tags matching `package.json` trigger reproducible static archives, SHA-256 checksums, a CycloneDX SBOM, GitHub artifact attestations, and native amd64 and arm64 GHCR images with build provenance. The publishing job assembles one multi-architecture manifest only after both native builds and the full static quality gate succeed. Repository-hosted rulesets, secret scanning, private vulnerability reporting, immutable releases, and package visibility remain platform settings that a maintainer must confirm before the first public tag.

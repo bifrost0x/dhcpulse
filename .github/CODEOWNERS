@@ -2,4 +2,8 @@
 
 /.github/ @bifrost0x
 /Dockerfile @bifrost0x
+/compose.yaml @bifrost0x
+/nginx.conf @bifrost0x
+/package-lock.json @bifrost0x
+/scripts/ @bifrost0x
 /SECURITY.md @bifrost0x

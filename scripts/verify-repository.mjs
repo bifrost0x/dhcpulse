@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import {
   findForbiddenPaths,
+  findMutableReleaseDownloads,
   findUnpinnedActionReferences,
   findUnpinnedDockerImages,
 } from './repository-policy.mjs';
@@ -33,9 +34,10 @@ const workflows = readdirSync(workflowDirectory, { withFileTypes: true })
     };
   });
 const unpinnedActions = findUnpinnedActionReferences(workflows);
+const mutableReleaseDownloads = findMutableReleaseDownloads(workflows);
 const unpinnedDockerImages = findUnpinnedDockerImages(readFileSync('Dockerfile', 'utf8'));
 
-if (forbiddenPaths.length > 0 || unpinnedActions.length > 0 || unpinnedDockerImages.length > 0) {
+if (forbiddenPaths.length > 0 || unpinnedActions.length > 0 || unpinnedDockerImages.length > 0 || mutableReleaseDownloads.length > 0) {
   console.error('Repository verification failed.');
   if (forbiddenPaths.length > 0) {
     console.error('Forbidden tracked paths:');
@@ -54,6 +56,12 @@ if (forbiddenPaths.length > 0 || unpinnedActions.length > 0 || unpinnedDockerIma
   }
   for (const image of unpinnedDockerImages) {
     console.error(`- ${image}`);
+  }
+  if (mutableReleaseDownloads.length > 0) {
+    console.error('Mutable latest-release workflow downloads:');
+  }
+  for (const reference of mutableReleaseDownloads) {
+    console.error(`- ${reference}`);
   }
   process.exit(1);
 }

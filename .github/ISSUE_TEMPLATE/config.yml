@@ -1,6 +1,9 @@
 blank_issues_enabled: false
 
 contact_links:
+  - name: Usage question
+    url: https://github.com/bifrost0x/dhcpulse/discussions
+    about: Ask how to export, import, interpret, deploy, or verify DHCPulse.
   - name: Security vulnerability
     url: https://github.com/bifrost0x/dhcpulse/security/policy
     about: Do not disclose suspected vulnerabilities in a public issue.
