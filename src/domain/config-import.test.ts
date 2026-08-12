@@ -32,6 +32,28 @@ describe('detectDhcpConfigFormat', () => {
     expect(detectDhcpConfigFormat(text, 'export.xml')).toBe('microsoft-xml');
     expect(importDhcpConfiguration({ text }).configuration.ipv4Scopes.length).toBeGreaterThan(0);
   });
+
+  it('parses Microsoft XML as data without using the browser DOM parser', () => {
+    const originalDomParser = globalThis.DOMParser;
+    globalThis.DOMParser = class DisabledDomParser {
+      constructor() {
+        throw new Error('The live DOM parser must not process imported configuration.');
+      }
+    } as typeof DOMParser;
+
+    try {
+      const configuration = importDhcpConfiguration({
+        text: microsoftXml,
+        fileName: 'export.xml',
+        format: 'microsoft-xml',
+      }).configuration;
+
+      expect(configuration.ipv4Scopes).toHaveLength(1);
+      expect(configuration.reservations[0]?.hostname).toBe('printer.example.com');
+    } finally {
+      globalThis.DOMParser = originalDomParser;
+    }
+  });
 });
 
 describe('importDhcpConfiguration', () => {
