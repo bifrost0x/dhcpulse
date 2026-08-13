@@ -49,6 +49,23 @@ describe('DHCPulse Workbench', () => {
     expect(screen.queryByText('11 tools ready')).not.toBeInTheDocument();
   });
 
+  it('explains the concrete admin outcomes before asking for a configuration', async () => {
+    const user = userEvent.setup();
+    renderAt();
+
+    const outcomes = screen.getByRole('region', { name: 'What DHCPulse produces' });
+    expect(within(outcomes).getByText('Searchable inventory')).toBeVisible();
+    expect(within(outcomes).getByText('Prioritized review')).toBeVisible();
+    expect(within(outcomes).getByText('Guarded change package')).toBeVisible();
+    expect(within(outcomes).getByText(/Preflight, Apply, Verify, and Rollback/)).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Deutsch' }));
+    const germanOutcomes = screen.getByRole('region', { name: 'Das liefert DHCPulse' });
+    expect(within(germanOutcomes).getByText('Durchsuchbares Inventar')).toBeVisible();
+    expect(within(germanOutcomes).getByText('Priorisierte Prüfung')).toBeVisible();
+    expect(within(germanOutcomes).getByText('Abgesichertes Änderungspaket')).toBeVisible();
+  });
+
   it('guides a Microsoft administrator from PowerShell export to local import', () => {
     renderAt();
 

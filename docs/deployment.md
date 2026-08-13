@@ -20,6 +20,19 @@ DHCPULSE_PORT=18080 docker compose up -d --wait
 
 The health check requests `http://127.0.0.1:8080/` inside the container.
 
+### Portainer stack
+
+DHCPulse can be deployed directly from the public repository without a local image build:
+
+1. Open **Stacks** and select **Add stack**.
+2. Choose **Git repository**.
+3. Use `https://github.com/bifrost0x/dhcpulse.git` as the repository URL.
+4. Use `compose.yaml` as the Compose path.
+5. Optionally define `DHCPULSE_PORT` for a different host port.
+6. Deploy the stack and wait for the health check.
+
+The standard Compose file contains an `image` reference and no `build` directive. Portainer therefore pulls the official GHCR image. Pin the image to a release tag or digest when the deployment requires controlled updates.
+
 To build the checked-out source intentionally, use the isolated developer override instead of the public deployment path:
 
 ```bash

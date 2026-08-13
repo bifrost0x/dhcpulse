@@ -2,6 +2,8 @@
 
 This guide takes an administrator from a supported configuration export to a reviewed DHCPulse workspace. Nothing is uploaded and DHCPulse does not connect to a DHCP server.
 
+For a screen-by-screen walkthrough using the bundled synthetic estate, see the [Operator guide](operator-guide.md).
+
 ## 1. Open DHCPulse
 
 Use one of the following startup paths.

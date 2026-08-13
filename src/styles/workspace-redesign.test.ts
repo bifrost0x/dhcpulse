@@ -8,6 +8,13 @@ async function readCss() {
 }
 
 describe('business workspace layout', () => {
+  it('presents the entry outcomes as a spacious grid that collapses on narrow screens', async () => {
+    const css = await readCss();
+    expect(css).toMatch(/\.config-outcome-grid\s*\{[^}]*grid-template-columns\s*:\s*repeat\(3\s*,\s*minmax\(0\s*,\s*1fr\)\)/i);
+    expect(css).toMatch(/\.config-outcome-grid\s+article\s*\{[^}]*padding\s*:\s*1\.35rem/i);
+    expect(css).toMatch(/@media\s*\(max-width\s*:\s*800px\)\s*\{[\s\S]*?\.config-outcome-grid\s*\{[^}]*grid-template-columns\s*:\s*1fr/i);
+  });
+
   it('uses the available desktop width and a four-column overview metric grid', async () => {
     const css = await readCss();
     expect(css).toMatch(/main\s*\{[^}]*max-width\s*:\s*1680px/i);
