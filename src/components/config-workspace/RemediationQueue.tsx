@@ -125,8 +125,7 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
   function renderContextPanel() {
     if (!context || !selected) return null;
     const actions = listFindingActions(workspace, context.finding);
-    const legacyAction = actions.length === 1
-      && (actions[0]!.id === 'exclude-reserved-address' || actions[0]!.id === 'exclude-gateway-address');
+    const legacyAction = actions.length === 1 && actions[0]!.id === 'exclude-gateway-address';
     const composerActions = legacyAction ? [] : actions;
     return <aside className="planner-card remediation-context" aria-label={locale === 'de' ? 'Befundkontext' : 'Finding context'}>
       <header><span className={`remediation-severity finding-${context.finding.severity}`}>{severityLabel(context.finding.severity, locale)}</span><h2 ref={contextHeadingRef} tabIndex={-1}>{titleFor(context.finding.ruleId)}</h2><small>{context.scopeLabel ?? (locale === 'de' ? 'Globaler Kontext' : 'Global context')}</small></header>

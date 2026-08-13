@@ -5,8 +5,9 @@ import type {
   DhcpScope,
 } from './config-model';
 import { deterministicConfigId } from './config-model';
-import { analyzeIpv4Cidr, parseIpv4 } from './ip-address';
+import { parseIpv4 } from './ip-address';
 import { analyzeMultiPoolScope } from './scope-design';
+import { workspaceRuleCatalog, workspaceSources } from './workspace-rule-catalog';
 
 export type WorkspaceEntityKind =
   | 'server'
@@ -38,7 +39,6 @@ export type WorkspaceRemediationKind =
   | 'option.set';
 
 export type WorkspaceActionId =
-  | 'exclude-reserved-address'
   | 'exclude-gateway-address'
   | 'resolve-duplicate-reservations'
   | 'update-reservation-address'
@@ -121,15 +121,6 @@ export interface MicrosoftWorkspace {
   scopeSummaries: Record<string, WorkspaceScopeSummary>;
   generation: { enabled: boolean; reasons: string[] };
 }
-
-const SOURCES = {
-  dhcp: 'https://www.rfc-editor.org/rfc/rfc2131.html',
-  options: 'https://www.iana.org/assignments/bootp-dhcp-parameters/',
-  microsoft: 'https://learn.microsoft.com/en-us/windows-server/networking/technologies/dhcp/dhcp-top',
-  kea: 'https://kea.readthedocs.io/en/latest/arm/config.html',
-  isc: 'https://kb.isc.org/docs/isc-dhcp-44-manual-pages-dhcpdconf',
-  dnsmasq: 'https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html',
-} as const;
 
 const severityRank = { blocker: 0, warning: 1, info: 2 } as const;
 
@@ -297,29 +288,23 @@ function buildFindings(
 
   const reservationsByAddress = groupBy(configuration.reservations.filter(({ protocol }) => protocol === 'dhcpv4'), ({ address }) => address.toLocaleLowerCase());
   for (const duplicates of reservationsByAddress.values()) {
-    if (duplicates.length > 1) addFinding(findings, 'duplicate-reservation-address', 'blocker', duplicates.map(({ id }) => id), { address: duplicates[0]!.address, count: duplicates.length }, SOURCES.dhcp);
+    if (duplicates.length > 1) addFinding(findings, 'duplicate-reservation-address', 'blocker', duplicates.map(({ id }) => id), { address: duplicates[0]!.address, count: duplicates.length }, workspaceRuleCatalog['duplicate-reservation-address'].source);
   }
   const reservationsByIdentifier = groupBy(
     configuration.reservations.filter(({ protocol, identifier }) => protocol === 'dhcpv4' && Boolean(identifier)),
     ({ identifier }) => identifier!.toLocaleLowerCase(),
   );
   for (const duplicates of reservationsByIdentifier.values()) {
-    if (duplicates.length > 1) addFinding(findings, 'duplicate-reservation-identifier', 'blocker', duplicates.map(({ id }) => id), { count: duplicates.length }, SOURCES.dhcp);
+    if (duplicates.length > 1) addFinding(findings, 'duplicate-reservation-identifier', 'blocker', duplicates.map(({ id }) => id), { count: duplicates.length }, workspaceRuleCatalog['duplicate-reservation-identifier'].source);
   }
 
   for (const scope of configuration.ipv4Scopes) {
-    const cidr = analyzeIpv4Cidr(scope.cidr);
     const pools = configuration.pools.filter(({ protocol, scopeId }) => protocol === 'dhcpv4' && scopeId === scope.id);
     const reservations = configuration.reservations.filter(({ protocol, scopeId }) => protocol === 'dhcpv4' && scopeId === scope.id);
     for (const reservation of reservations) {
-      const address = parseIpv4(reservation.address);
-      const insideScope = cidr && address !== null && address >= parseIpv4(cidr.network)! && address <= parseIpv4(cidr.broadcast)!;
-      if (!insideScope) {
-        addFinding(findings, 'reservation-outside-scope', 'blocker', [reservation.id, scope.id], { address: reservation.address, cidr: scope.cidr }, SOURCES.dhcp, { kind: 'reservation.update', targetId: reservation.id });
-      }
-      const pool = pools.find((candidate) => addressInRange(reservation.address, candidate.start, candidate.end));
-      if (pool) {
-        addFinding(findings, 'reservation-in-dynamic-pool', 'warning', [reservation.id, scope.id], { address: reservation.address, poolStart: pool.start, poolEnd: pool.end }, vendorSource, { kind: 'exclusion.add', targetId: scope.id }, 'exclude-reserved-address');
+      const insideDistributionRange = pools.some((pool) => addressInRange(reservation.address, pool.start, pool.end));
+      if (!insideDistributionRange) {
+        addFinding(findings, 'reservation-outside-scope', 'blocker', [reservation.id, scope.id], { address: reservation.address, cidr: scope.cidr }, workspaceRuleCatalog['reservation-outside-scope'].source, { kind: 'reservation.update', targetId: reservation.id });
       }
     }
 
@@ -327,12 +312,12 @@ function buildFindings(
     for (const option of scopeOptions.filter(({ code }) => code === 3 || code === 6 || code === 42)) {
       const addresses = optionAddresses(option.value);
       if (addresses.length === 0 || addresses.some((address) => parseIpv4(address) === null)) {
-        addFinding(findings, 'invalid-address-option', 'blocker', [option.id, scope.id], { optionCode: option.code ?? 0 }, SOURCES.options, { kind: 'option.set', targetId: option.id });
+        addFinding(findings, 'invalid-address-option', 'blocker', [option.id, scope.id], { optionCode: option.code ?? 0 }, workspaceRuleCatalog['invalid-address-option'].source, { kind: 'option.set', targetId: option.id });
       }
       if (option.code === 3) {
         for (const address of addresses) {
           const pool = pools.find((candidate) => addressInRange(address, candidate.start, candidate.end));
-          if (pool) addFinding(findings, 'gateway-in-dynamic-pool', 'warning', [option.id, scope.id], { address, poolStart: pool.start, poolEnd: pool.end }, SOURCES.dhcp, { kind: 'exclusion.add', targetId: scope.id }, 'exclude-gateway-address');
+          if (pool) addFinding(findings, 'gateway-in-dynamic-pool', 'warning', [option.id, scope.id], { address, poolStart: pool.start, poolEnd: pool.end }, workspaceRuleCatalog['gateway-in-dynamic-pool'].source, { kind: 'exclusion.add', targetId: scope.id }, 'exclude-gateway-address');
         }
       }
     }
@@ -341,18 +326,18 @@ function buildFindings(
     for (const option of scopeOptions) {
       const inherited = globalByKey.get(optionKey(option));
       if (inherited && displayOptionValue(inherited.value) !== displayOptionValue(option.value)) {
-        addFinding(findings, 'scope-option-overrides-server', 'info', [option.id, inherited.id, scope.id], { optionCode: option.code ?? 0 }, SOURCES.microsoft);
+        addFinding(findings, 'scope-option-overrides-server', 'info', [option.id, inherited.id, scope.id], { optionCode: option.code ?? 0 }, workspaceRuleCatalog['scope-option-overrides-server'].source);
       }
     }
 
     const summary = scopeSummaries[scope.id];
     if (scope.observedLeaseCount !== undefined && summary && summary.utilizationPercent >= 80) {
-      addFinding(findings, 'scope-capacity-low', summary.utilizationPercent >= 100 ? 'blocker' : 'warning', [scope.id], { used: summary.currentlyUsedAddresses, capacity: summary.effectiveCapacity, utilizationPercent: Math.round(summary.utilizationPercent) }, SOURCES.microsoft, { kind: 'scope-range.set', targetId: scope.id });
+      addFinding(findings, 'scope-capacity-low', summary.utilizationPercent >= 100 ? 'blocker' : 'warning', [scope.id], { used: summary.currentlyUsedAddresses, capacity: summary.effectiveCapacity, utilizationPercent: Math.round(summary.utilizationPercent) }, workspaceRuleCatalog['scope-capacity-low'].source, { kind: 'scope-range.set', targetId: scope.id });
     }
   }
 
   for (const relationship of configuration.failoverRelationships) {
-    if (relationship.scopeIds.length === 0) addFinding(findings, 'failover-scope-membership-missing', 'warning', [relationship.id], { relationship: relationship.name }, SOURCES.microsoft);
+    if (relationship.scopeIds.length === 0) addFinding(findings, 'failover-scope-membership-missing', 'warning', [relationship.id], { relationship: relationship.name }, workspaceRuleCatalog['failover-scope-membership-missing'].source);
   }
 
   return findings.sort((left, right) => severityRank[left.severity] - severityRank[right.severity] || compareText(left.ruleId, right.ruleId) || compareText(left.id, right.id));
@@ -389,10 +374,10 @@ function addFinding(
 
 function sourceForFormat(format: DhcpConfiguration['metadata']['source']['format']): string {
   switch (format) {
-    case 'microsoft-xml': return SOURCES.microsoft;
-    case 'kea-json': return SOURCES.kea;
-    case 'isc-dhcpd': return SOURCES.isc;
-    case 'dnsmasq': return SOURCES.dnsmasq;
+    case 'microsoft-xml': return workspaceSources.microsoft;
+    case 'kea-json': return workspaceSources.kea;
+    case 'isc-dhcpd': return workspaceSources.isc;
+    case 'dnsmasq': return workspaceSources.dnsmasq;
   }
 }
 

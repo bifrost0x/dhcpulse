@@ -15,36 +15,41 @@ function workspace(text: string, fileName: string) {
   return buildConfigurationWorkspace(importDhcpConfiguration({ text, fileName }).configuration);
 }
 
+function workspaceWithGatewayInPool() {
+  const imported = workspace(microsoftXml, 'export.xml');
+  const scope = imported.configuration.ipv4Scopes[0]!;
+  return buildConfigurationWorkspace({
+    ...imported.configuration,
+    options: [...imported.configuration.options, {
+      id: 'gateway-in-pool',
+      provenance: scope.provenance,
+      protocol: 'dhcpv4' as const,
+      code: 3,
+      value: '192.0.2.60',
+      level: 'scope' as const,
+      scopeId: scope.id,
+    }],
+  });
+}
+
 describe('finding actions', () => {
-  it('prepares an exclusion for a Microsoft reservation inside a dynamic pool', () => {
+  it('does not offer an exclusion for a legacy reservation-in-pool finding', () => {
     const current = workspace(microsoftXml, 'export.xml');
-    const finding = current.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
+    const basis = current.findings.find(({ ruleId }) => ruleId === 'parser-warning')!;
+    const legacyFinding = { ...basis, ruleId: 'reservation-in-dynamic-pool', confidence: 'certain' as const };
 
-    expect(listFindingActions(current, finding)).toEqual([
-      expect.objectContaining({ id: 'exclude-reserved-address', operationKind: 'exclusion.add' }),
-    ]);
-    const result = prepareFindingAction(current, finding, 'exclude-reserved-address');
-
-    expect(result.valid).toBe(true);
-    expect(result.changeSet.operations).toEqual([
-      expect.objectContaining({
-        kind: 'exclusion.add',
-        targetId: current.configuration.ipv4Scopes[0]!.id,
-        rationaleFindingId: finding.id,
-        after: { start: '192.0.2.50', end: '192.0.2.50' },
-      }),
-    ]);
+    expect(listFindingActions(current, legacyFinding)).toEqual([]);
   });
 
   it('keeps preparing the same finding idempotent', () => {
-    const current = workspace(microsoftXml, 'export.xml');
-    const finding = current.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
-    const first = prepareFindingAction(current, finding, 'exclude-reserved-address');
+    const current = workspaceWithGatewayInPool();
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'gateway-in-dynamic-pool')!;
+    const first = prepareFindingAction(current, finding, 'exclude-gateway-address');
 
     const repeated = prepareFindingAction(
       current,
       finding,
-      'exclude-reserved-address',
+      'exclude-gateway-address',
       first.changeSet,
     );
 
@@ -54,20 +59,20 @@ describe('finding actions', () => {
   });
 
   it('preserves operation order when an existing action is prepared again', () => {
-    const current = workspace(microsoftXml, 'export.xml');
-    const reservation = current.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
-    const secondReservation = {
-      ...reservation,
-      id: `${reservation.id}-second`,
-      evidence: { ...reservation.evidence, address: '192.0.2.51' },
+    const current = workspaceWithGatewayInPool();
+    const gateway = current.findings.find(({ ruleId }) => ruleId === 'gateway-in-dynamic-pool')!;
+    const secondGateway = {
+      ...gateway,
+      id: `${gateway.id}-second`,
+      evidence: { ...gateway.evidence, address: '192.0.2.61' },
     };
-    const first = prepareFindingAction(current, reservation, 'exclude-reserved-address');
-    const second = prepareFindingAction(current, secondReservation, 'exclude-reserved-address', first.changeSet);
+    const first = prepareFindingAction(current, gateway, 'exclude-gateway-address');
+    const second = prepareFindingAction(current, secondGateway, 'exclude-gateway-address', first.changeSet);
 
     const repeated = prepareFindingAction(
       current,
-      reservation,
-      'exclude-reserved-address',
+      gateway,
+      'exclude-gateway-address',
       second.changeSet,
     );
 
@@ -83,24 +88,24 @@ describe('finding actions', () => {
   });
 
   it('rejects unknown, mismatched, and limited-confidence actions with stable codes', () => {
-    const current = workspace(microsoftXml, 'export.xml');
-    const actionable = current.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
+    const current = workspaceWithGatewayInPool();
+    const actionable = current.findings.find(({ ruleId }) => ruleId === 'gateway-in-dynamic-pool')!;
     const limited = current.findings.find(({ ruleId }) => ruleId === 'parser-warning')!;
 
-    expect(() => prepareFindingAction(current, actionable, 'exclude-gateway-address')).toThrowError(
+    expect(() => prepareFindingAction(current, actionable, 'remove-scope-option')).toThrowError(
       expect.objectContaining<Partial<FindingActionError>>({ code: 'ACTION_NOT_AVAILABLE' }),
     );
-    expect(() => prepareFindingAction(current, limited, 'exclude-reserved-address')).toThrowError(
+    expect(() => prepareFindingAction(current, limited, 'exclude-gateway-address')).toThrowError(
       expect.objectContaining<Partial<FindingActionError>>({ code: 'ACTION_NOT_AVAILABLE' }),
     );
   });
 
   it('rejects action evidence that is not a single address string', () => {
-    const current = workspace(microsoftXml, 'export.xml');
-    const finding = current.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
+    const current = workspaceWithGatewayInPool();
+    const finding = current.findings.find(({ ruleId }) => ruleId === 'gateway-in-dynamic-pool')!;
     const unsafe = { ...finding, evidence: { ...finding.evidence, address: 42 } };
 
-    expect(() => prepareFindingAction(current, unsafe, 'exclude-reserved-address')).toThrowError(
+    expect(() => prepareFindingAction(current, unsafe, 'exclude-gateway-address')).toThrowError(
       expect.objectContaining<Partial<FindingActionError>>({ code: 'INVALID_EVIDENCE' }),
     );
   });

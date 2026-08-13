@@ -29,9 +29,9 @@ describe('scope-first workspace selectors', () => {
 
   it('groups repeated findings and resolves their affected scopes', () => {
     const groups = groupWorkspaceFindings(largeWorkspace());
-    const repeated = groups.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool');
+    const repeated = groups.find(({ ruleId }) => ruleId === 'scope-option-overrides-server');
 
-    expect(repeated).toMatchObject({ severity: 'warning', count: 298 });
+    expect(repeated).toMatchObject({ severity: 'info', count: 24 });
     expect(repeated?.scopeIds).toHaveLength(12);
     expect(groups.filter(({ severity }) => severity === 'blocker').length).toBeGreaterThan(0);
   });

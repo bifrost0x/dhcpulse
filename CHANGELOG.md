@@ -4,6 +4,20 @@ All notable changes to DHCPulse are documented in this file. The format follows 
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-13
+
+### Fixed
+
+- Removed an incorrect Microsoft DHCP warning that treated reservations inside the scope distribution range as unsafe.
+- Removed the corresponding exclusion proposal so generated change plans follow Microsoft DHCP reservation semantics.
+- Centralized workspace rule copy and authoritative references in a tested domain catalog.
+
+### Changed
+
+- Updated workspace tests and example workflows to use genuine gateway and option risks.
+- Removed an unused legacy findings component.
+- Clarified that the `latest` container tag follows the latest tagged release rather than every commit on `main`.
+
 ## [0.1.0] - 2026-08-12
 
 ### Added
@@ -18,5 +32,6 @@ All notable changes to DHCPulse are documented in this file. The format follows 
 
 - Bounded input size and parser structure, XML entity declaration rejection, output redaction, PowerShell literal quoting, stale-export cancellation, and immutable dependency/action/container references.
 
-[Unreleased]: https://github.com/bifrost0x/dhcpulse/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bifrost0x/dhcpulse/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/bifrost0x/dhcpulse/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bifrost0x/dhcpulse/releases/tag/v0.1.0

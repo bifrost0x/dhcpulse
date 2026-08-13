@@ -8,6 +8,7 @@ import type { ConfigurationWorkspace, WorkspaceFinding } from '../../domain/conf
 import { generatePowerShellPackage, type PowerShellPackage } from '../../domain/powershell-package';
 import { summarizeTargetRisk } from '../../domain/remediation-queue';
 import { evaluatePackageEligibility } from '../../domain/workspace-view';
+import { workspaceRuleCatalog, workspaceRuleCopy } from '../../domain/workspace-rule-catalog';
 import { WorkspaceObjectView } from '../workspace/WorkspaceObjectView';
 import { RemediationQueue, type RemediationQueueHandle } from './RemediationQueue';
 import { WorkspaceActionComposer } from './WorkspaceActionComposer';
@@ -24,58 +25,17 @@ interface Props {
   onClose: () => void;
 }
 
-const titles: Record<Locale, Record<string, string>> = {
-  en: {
-    'parser-warning': 'The configuration contains unsupported or partially parsed data',
-    'duplicate-reservation-address': 'Reservation address is duplicated',
-    'duplicate-reservation-identifier': 'Reservation client identifier is duplicated',
-    'reservation-outside-scope': 'Reservation is outside its scope',
-    'reservation-in-dynamic-pool': 'Reservation is inside a dynamic pool',
-    'invalid-address-option': 'Address option contains an invalid value',
-    'gateway-in-dynamic-pool': 'Gateway is inside a dynamic pool',
-    'scope-option-overrides-server': 'Scope option overrides the server value',
-    'scope-capacity-low': 'Scope address capacity is low',
-    'failover-scope-membership-missing': 'Failover scope membership is not present in the export',
-  },
-  de: {
-    'parser-warning': 'Die Konfiguration enthält nicht unterstützte oder nur teilweise analysierte Daten',
-    'duplicate-reservation-address': 'Reservierungsadresse ist doppelt vorhanden',
-    'duplicate-reservation-identifier': 'Client-ID einer Reservierung ist doppelt vorhanden',
-    'reservation-outside-scope': 'Reservierung liegt außerhalb ihres Scopes',
-    'reservation-in-dynamic-pool': 'Reservierung liegt in einem dynamischen Pool',
-    'invalid-address-option': 'Adressoption enthält einen ungültigen Wert',
-    'gateway-in-dynamic-pool': 'Gateway liegt in einem dynamischen Pool',
-    'scope-option-overrides-server': 'Scope-Option überschreibt den Serverwert',
-    'scope-capacity-low': 'Adresskapazität des Scopes wird knapp',
-    'failover-scope-membership-missing': 'Failover-Scope-Zuordnung fehlt im Export',
-  },
-};
+const fallbackExplanation = (locale: Locale) => ({
+  rationale: locale === 'de' ? 'Die importierten Felder haben diese Regel ausgelöst.' : 'The imported fields triggered this rule.',
+  impact: locale === 'de' ? 'Der Befund sollte im Umgebungskontext geprüft werden.' : 'Review this finding in the environment context.',
+  recommendation: locale === 'de' ? 'Evidenz und Quellobjekt vor Änderungen prüfen.' : 'Review evidence and source object before changes.',
+});
 
-const explanations: Record<Locale, Record<string, { rationale: string; impact: string; recommendation: string }>> = {
-  en: {
-    'parser-warning': { rationale: 'The bounded importer reported syntax or vendor-specific content it could not fully interpret.', impact: 'Some configuration objects or relationships may be absent, so the assessment can be incomplete.', recommendation: 'Review the cited source location and validate the original configuration with the vendor tooling.' },
-    'duplicate-reservation-address': { rationale: 'More than one imported reservation uses the same IP address.', impact: 'Different clients can be assigned the same address and lose connectivity.', recommendation: 'Keep the intended reservation and remove or re-address the conflicting mapping.' },
-    'duplicate-reservation-identifier': { rationale: 'The same client identifier is attached to more than one reservation.', impact: 'The server can match one client to ambiguous reservation records.', recommendation: 'Give every client a unique identifier and remove the duplicate mapping.' },
-    'reservation-outside-scope': { rationale: 'The reserved address is not contained in the imported scope network.', impact: 'The server cannot reliably serve that address from the referenced scope.', recommendation: 'Move the reservation into the correct scope or correct the scope network and address.' },
-    'reservation-in-dynamic-pool': { rationale: 'The reservation address falls between the imported pool start and end addresses.', impact: 'The address can be allocated dynamically and requested by the reserved client, causing an address conflict.', recommendation: 'Exclude this address from the dynamic pool before relying on the reservation.' },
-    'invalid-address-option': { rationale: 'An imported router, DNS, or NTP option contains no parseable IPv4 address.', impact: 'Clients can receive unusable network settings and fail name resolution, routing, or time synchronization.', recommendation: 'Replace the option value with valid IPv4 addresses and verify it with the vendor tooling.' },
-    'gateway-in-dynamic-pool': { rationale: 'The imported router option points to an address inside the dynamic pool.', impact: 'The gateway address can be offered to a client, which can break connectivity for the affected network.', recommendation: 'Exclude the gateway address from the dynamic pool.' },
-    'scope-option-overrides-server': { rationale: 'A scope-level option differs from the imported server-level value.', impact: 'Clients in this scope receive different effective settings than the server default.', recommendation: 'Confirm the override is intentional, then align the values or remove the scope override.' },
-    'scope-capacity-low': { rationale: 'Observed leases approach or exceed the usable address capacity after exclusions.', impact: 'New clients may fail to obtain an address during normal demand or short peaks.', recommendation: 'Verify lease observations, then expand or split the pool, shorten leases, or reduce demand.' },
-    'failover-scope-membership-missing': { rationale: 'A failover relationship was imported without associated scope identifiers.', impact: 'DHCPulse cannot prove which scopes are protected by that relationship.', recommendation: 'Verify scope membership on both partners with the Microsoft DHCP management tools.' },
-  },
-  de: {
-    'parser-warning': { rationale: 'Der begrenzte Importer hat Syntax oder herstellerspezifische Inhalte gemeldet, die er nicht vollständig interpretieren konnte.', impact: 'Konfigurationsobjekte oder Beziehungen können fehlen; die Bewertung kann daher unvollständig sein.', recommendation: 'Die genannte Quellposition prüfen und die Originalkonfiguration zusätzlich mit dem Herstellerwerkzeug validieren.' },
-    'duplicate-reservation-address': { rationale: 'Mehrere importierte Reservierungen verwenden dieselbe IP-Adresse.', impact: 'Unterschiedliche Clients können dieselbe Adresse erhalten und ihre Verbindung verlieren.', recommendation: 'Die beabsichtigte Reservierung behalten und die kollidierende Zuordnung entfernen oder neu adressieren.' },
-    'duplicate-reservation-identifier': { rationale: 'Dieselbe Client-ID ist mehreren Reservierungen zugeordnet.', impact: 'Der Server kann einen Client nicht eindeutig einer Reservierung zuordnen.', recommendation: 'Jedem Client eine eindeutige Kennung geben und die doppelte Zuordnung entfernen.' },
-    'reservation-outside-scope': { rationale: 'Die reservierte Adresse liegt nicht im importierten Scope-Netz.', impact: 'Der Server kann diese Adresse aus dem referenzierten Scope nicht zuverlässig bereitstellen.', recommendation: 'Die Reservierung in den richtigen Scope verschieben oder Scope-Netz und Adresse korrigieren.' },
-    'reservation-in-dynamic-pool': { rationale: 'Die Reservierungsadresse liegt zwischen importiertem Pool-Start und Pool-Ende.', impact: 'Die Adresse kann dynamisch vergeben und zugleich vom reservierten Client angefordert werden. Dadurch kann ein Adresskonflikt entstehen.', recommendation: 'Diese Adresse vor Nutzung der Reservierung aus dem dynamischen Pool ausschließen.' },
-    'invalid-address-option': { rationale: 'Eine importierte Router-, DNS- oder NTP-Option enthält keine lesbare IPv4-Adresse.', impact: 'Clients können unbrauchbare Netzwerkeinstellungen erhalten; Routing, Namensauflösung oder Zeitsynchronisierung können ausfallen.', recommendation: 'Den Optionswert durch gültige IPv4-Adressen ersetzen und mit dem Herstellerwerkzeug prüfen.' },
-    'gateway-in-dynamic-pool': { rationale: 'Die importierte Router-Option verweist auf eine Adresse im dynamischen Pool.', impact: 'Die Gateway-Adresse kann einem Client angeboten werden und dadurch die Konnektivität im betroffenen Netz unterbrechen.', recommendation: 'Die Gateway-Adresse aus dem dynamischen Pool ausschließen.' },
-    'scope-option-overrides-server': { rationale: 'Eine Option auf Scope-Ebene weicht vom importierten Serverwert ab.', impact: 'Clients in diesem Scope erhalten andere wirksame Einstellungen als den Serverstandard.', recommendation: 'Die Abweichung bestätigen und anschließend die Werte angleichen oder die Scope-Überschreibung entfernen.' },
-    'scope-capacity-low': { rationale: 'Beobachtete Leases nähern sich der nutzbaren Adresskapazität nach Abzug der Ausschlüsse oder überschreiten sie.', impact: 'Neue Clients erhalten bei normaler Last oder kurzen Spitzen möglicherweise keine Adresse.', recommendation: 'Lease-Beobachtung prüfen und danach den Pool erweitern oder teilen, Lease-Zeiten verkürzen oder Bedarf reduzieren.' },
-    'failover-scope-membership-missing': { rationale: 'Eine Failover-Beziehung wurde ohne zugeordnete Scope-IDs importiert.', impact: 'DHCPulse kann nicht belegen, welche Scopes durch diese Beziehung geschützt sind.', recommendation: 'Die Scope-Zuordnung auf beiden Partnern mit den Microsoft-DHCP-Verwaltungswerkzeugen prüfen.' },
-  },
+const findingTitle = (ruleId: string, locale: Locale) => workspaceRuleCopy(ruleId, locale)?.title ?? ruleId;
+const findingExplanation = (ruleId: string, locale: Locale) => workspaceRuleCopy(ruleId, locale) ?? fallbackExplanation(locale);
+const titles: Record<Locale, Record<string, string>> = {
+  en: Object.fromEntries(Object.entries(workspaceRuleCatalog).map(([ruleId, rule]) => [ruleId, rule.copy.en.title])),
+  de: Object.fromEntries(Object.entries(workspaceRuleCatalog).map(([ruleId, rule]) => [ruleId, rule.copy.de.title])),
 };
 
 export function ConfigurationWorkspaceView({ locale, workspace, fileName, headingRef, onClose }: Props) {
@@ -151,7 +111,7 @@ export function ConfigurationWorkspaceView({ locale, workspace, fileName, headin
       {tabs.map((item, index) => <button key={item.id} id={`workspace-tab-${item.id}`} ref={(node) => { tabRefs.current[index] = node; }} type="button" role="tab" tabIndex={tab === item.id ? 0 : -1} aria-selected={tab === item.id} aria-controls={`workspace-panel-${item.id}`} onClick={() => selectTab(item.id)} onKeyDown={(event) => handleTabKey(event, index)}>{item.label}</button>)}
     </div>
     <div id={`workspace-panel-${tab}`} className="workspace-product-panel" role="tabpanel" aria-labelledby={`workspace-tab-${tab}`}>
-      <div hidden={tab !== 'remediate'}><RemediationQueue ref={remediationRef} locale={locale} workspace={workspace} result={changeResult} titleFor={(ruleId) => titles[locale][ruleId] ?? ruleId} explanationFor={(ruleId) => explanations[locale][ruleId] ?? { rationale: locale === 'de' ? 'Die importierten Felder haben diese Regel ausgelöst.' : 'The imported fields triggered this rule.', impact: locale === 'de' ? 'Der Befund sollte im Umgebungskontext geprüft werden.' : 'Review this finding in the environment context.', recommendation: locale === 'de' ? 'Evidenz und Quellobjekt vor Änderungen prüfen.' : 'Review evidence and source object before changes.' }} evidenceLabel={(key) => evidenceLabel(key, locale)} onPrepare={prepare} onPrepareResult={acceptChangeResult} onOpenObject={openObject} onReviewChanges={() => navigateToTab('changes')} /></div>
+      <div hidden={tab !== 'remediate'}><RemediationQueue ref={remediationRef} locale={locale} workspace={workspace} result={changeResult} titleFor={(ruleId) => findingTitle(ruleId, locale)} explanationFor={(ruleId) => findingExplanation(ruleId, locale)} evidenceLabel={(key) => evidenceLabel(key, locale)} onPrepare={prepare} onPrepareResult={acceptChangeResult} onOpenObject={openObject} onReviewChanges={() => navigateToTab('changes')} /></div>
       {tab === 'overview' && <Overview locale={locale} workspace={workspace} changeCount={changeResult?.changeSet.operations.length ?? 0} onOpenObjects={() => navigateToTab('objects')} onReviewFindings={() => navigateToTab('remediate')} onReviewChanges={() => navigateToTab('changes')} />}
       {tab === 'objects' && <Objects locale={locale} workspace={workspace} selected={selected} result={changeResult} onSelect={setSelectedId} onPrepareResult={acceptChangeResult} />}
       {tab === 'changes' && <Changes locale={locale} workspace={workspace} result={changeResult} onBack={(findingId, targetScopeId) => { if (findingId) remediationRef.current?.focusFinding(findingId, targetScopeId); navigateToTab('remediate'); }} onReviewTarget={openObject} onExport={() => navigateToTab('package')} onRemove={(id) => { if (changeResult) setChangeResult(removeChangeOperation(workspace, changeResult.changeSet, id)); setGenerated(null); }} />}
@@ -262,7 +222,7 @@ function Changes({ locale, workspace, result, onRemove, onBack, onReviewTarget, 
     const before = operation.kind === 'exclusion.add' ? (locale === 'de' ? 'Kein Ausschluss für diese Adresse' : 'No exclusion for this address') : formatOperationState(operation, 'before', locale);
     const after = formatOperationState(operation, 'after', locale);
     const issues = result.issues.filter(({ operationId }) => operationId === operation.id);
-    return <li key={operation.id}><div className="workspace-change-review"><strong>{operationLabel(operation.kind, locale)}</strong><dl><div><dt>{locale === 'de' ? 'Ziel' : 'Target'}</dt><dd>{operationTargetLabel(workspace, operation, locale)}</dd></div><div><dt>{locale === 'de' ? 'Begründung' : 'Rationale'}</dt><dd>{finding ? titles[locale][finding.ruleId] ?? finding.ruleId : locale === 'de' ? 'Bestandsänderung gegen die importierte Konfiguration validiert' : 'Inventory change validated against the imported configuration'}</dd></div><div><dt>{locale === 'de' ? 'Vorher' : 'Before'}</dt><dd>{before}</dd></div><div><dt>{locale === 'de' ? 'Nachher' : 'After'}</dt><dd>{after}</dd></div></dl>{issues.length > 0 && <ul className="workspace-change-issues">{issues.map((issue) => <li key={`${operation.id}-${issue.code}`}>{issueLabel(issue.code, locale)}</li>)}</ul>}</div><div className="workspace-change-actions">{finding ? <button type="button" className="text-button" onClick={() => onBack(finding.id, operation.targetId)}>{locale === 'de' ? 'Begründung beim Problem prüfen' : 'Review issue rationale'}</button> : <button type="button" className="text-button" onClick={() => onReviewTarget(operation.targetId)}>{operation.kind === 'scope.clone' ? (locale === 'de' ? 'Quell-Scope im Bestand prüfen' : 'Review source scope in inventory') : (locale === 'de' ? 'Ziel im Bestand prüfen' : 'Review target in inventory')}</button>}<button type="button" className="text-button" onClick={() => onRemove(operation.id)}>{locale === 'de' ? 'Entfernen' : 'Remove'}</button></div></li>;
+    return <li key={operation.id}><div className="workspace-change-review"><strong>{operationLabel(operation.kind, locale)}</strong><dl><div><dt>{locale === 'de' ? 'Ziel' : 'Target'}</dt><dd>{operationTargetLabel(workspace, operation, locale)}</dd></div><div><dt>{locale === 'de' ? 'Begründung' : 'Rationale'}</dt><dd>{finding ? findingTitle(finding.ruleId, locale) : locale === 'de' ? 'Bestandsänderung gegen die importierte Konfiguration validiert' : 'Inventory change validated against the imported configuration'}</dd></div><div><dt>{locale === 'de' ? 'Vorher' : 'Before'}</dt><dd>{before}</dd></div><div><dt>{locale === 'de' ? 'Nachher' : 'After'}</dt><dd>{after}</dd></div></dl>{issues.length > 0 && <ul className="workspace-change-issues">{issues.map((issue) => <li key={`${operation.id}-${issue.code}`}>{issueLabel(issue.code, locale)}</li>)}</ul>}</div><div className="workspace-change-actions">{finding ? <button type="button" className="text-button" onClick={() => onBack(finding.id, operation.targetId)}>{locale === 'de' ? 'Begründung beim Problem prüfen' : 'Review issue rationale'}</button> : <button type="button" className="text-button" onClick={() => onReviewTarget(operation.targetId)}>{operation.kind === 'scope.clone' ? (locale === 'de' ? 'Quell-Scope im Bestand prüfen' : 'Review source scope in inventory') : (locale === 'de' ? 'Ziel im Bestand prüfen' : 'Review target in inventory')}</button>}<button type="button" className="text-button" onClick={() => onRemove(operation.id)}>{locale === 'de' ? 'Entfernen' : 'Remove'}</button></div></li>;
   })}</ol>{result.issues.length > 0 && <ul className="workspace-change-issues">{result.issues.map((issue) => <li key={`${issue.operationId ?? 'set'}-${issue.code}`}>{issueLabel(issue.code, locale)}</li>)}</ul>}<div className="workspace-change-completion"><p className={result.valid ? 'validation-ok' : 'field-error'}>{result.valid ? (locale === 'de' ? 'Validierung bestanden.' : 'Validation passed.') : (locale === 'de' ? 'Validierung blockiert.' : 'Validation blocked.')}</p><button type="button" className="primary-button" disabled={!result.valid} onClick={onExport}>{locale === 'de' ? 'Export prüfen' : 'Review export'}</button></div></section>;
 }
 

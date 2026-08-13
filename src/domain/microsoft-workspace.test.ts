@@ -50,18 +50,34 @@ describe('Microsoft DHCP workspace', () => {
     expect(searchWorkspace(workspace, 'not-present')).toEqual([]);
   });
 
+  it('does not flag a Microsoft reservation merely because it is inside the distribution range', () => {
+    const configuration = importedMicrosoft();
+    const before = JSON.stringify(configuration);
+    const workspace = buildMicrosoftWorkspace(configuration);
+
+    expect(JSON.stringify(configuration)).toBe(before);
+    expect(workspace.findings).not.toContainEqual(expect.objectContaining({
+      ruleId: 'reservation-in-dynamic-pool',
+    }));
+  });
+
+  it('flags a Microsoft reservation inside the subnet but outside its distribution range', () => {
+    const configuration = importedMicrosoft();
+    const reservation = configuration.reservations[0]!;
+    reservation.address = '192.0.2.10';
+
+    expect(buildMicrosoftWorkspace(configuration).findings).toContainEqual(expect.objectContaining({
+      ruleId: 'reservation-outside-scope',
+      entityIds: expect.arrayContaining([reservation.id]),
+    }));
+  });
+
   it('derives evidence-backed findings without mutating the imported configuration', () => {
     const configuration = importedMicrosoft();
     const before = JSON.stringify(configuration);
     const workspace = buildMicrosoftWorkspace(configuration);
 
     expect(JSON.stringify(configuration)).toBe(before);
-    expect(workspace.findings).toContainEqual(expect.objectContaining({
-      ruleId: 'reservation-in-dynamic-pool',
-      severity: 'warning',
-      entityIds: [configuration.reservations[0]!.id, configuration.ipv4Scopes[0]!.id],
-      evidence: expect.objectContaining({ address: '192.0.2.50' }),
-    }));
     expect(workspace.findings).toContainEqual(expect.objectContaining({
       ruleId: 'failover-scope-membership-missing',
       severity: 'warning',

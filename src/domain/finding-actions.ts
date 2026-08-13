@@ -39,8 +39,6 @@ export function listFindingActions(
   if (workspace.format !== 'microsoft-xml' || !workspace.capabilities.executableChanges) return [];
   if (finding.confidence !== 'certain') return [];
   switch (finding.ruleId) {
-    case 'reservation-in-dynamic-pool':
-      return [automatic('exclude-reserved-address', 'exclusion.add')];
     case 'gateway-in-dynamic-pool':
       return [automatic('exclude-gateway-address', 'exclusion.add')];
     case 'duplicate-reservation-address':
@@ -128,7 +126,7 @@ function buildOperations(
   actionId: WorkspaceActionId,
   values: WorkspaceActionValues,
 ): DhcpChangeOperation[] {
-  if (actionId === 'exclude-reserved-address' || actionId === 'exclude-gateway-address') {
+  if (actionId === 'exclude-gateway-address') {
     return [buildSingleAddressExclusion(workspace, finding, actionId)];
   }
   if (actionId === 'resolve-duplicate-reservations') {

@@ -30,7 +30,6 @@ describe('remediation queue', () => {
       'duplicate-reservation-address',
       'duplicate-reservation-identifier',
       'invalid-address-option',
-      'reservation-in-dynamic-pool',
       'gateway-in-dynamic-pool',
       'scope-option-overrides-server',
     ]);
@@ -52,13 +51,13 @@ describe('remediation queue', () => {
 
   it('tracks prepared occurrences without hiding the remaining work', () => {
     const workspace = largeWorkspace();
-    const finding = workspace.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
-    const result = prepareFindingAction(workspace, finding, finding.actionId!, createChangeSet(workspace));
+    const finding = workspace.findings.find(({ ruleId }) => ruleId === 'scope-option-overrides-server')!;
+    const result = prepareFindingAction(workspace, finding, 'align-option-with-server', createChangeSet(workspace));
     const item = buildRemediationQueue(workspace, result).sections['act-now']
       .find(({ ruleId }) => ruleId === finding.ruleId)!;
 
-    expect(item).toMatchObject({ affectedCount: 298, preparedCount: 1, actionable: true });
-    const preparedScopeId = workspace.configuration.reservations.find(({ id }) => finding.entityIds.includes(id))?.scopeId;
+    expect(item).toMatchObject({ affectedCount: 24, preparedCount: 1, actionable: true });
+    const preparedScopeId = workspace.configuration.ipv4Scopes.find(({ id }) => finding.entityIds.includes(id))?.id;
     const otherScopeId = workspace.configuration.ipv4Scopes.find(({ id }) => id !== preparedScopeId)!.id;
     expect(countPreparedRemediationOccurrences(workspace, item, result, preparedScopeId)).toBe(1);
     expect(countPreparedRemediationOccurrences(workspace, item, result, otherScopeId)).toBe(0);
@@ -67,10 +66,10 @@ describe('remediation queue', () => {
   it('preserves occurrence, scope, relationship, and provenance context', () => {
     const workspace = largeWorkspace();
     const item = buildRemediationQueue(workspace).sections['act-now']
-      .find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
+      .find(({ ruleId }) => ruleId === 'scope-option-overrides-server')!;
     const context = buildRemediationContext(workspace, item, 0);
 
-    expect(context.occurrenceCount).toBe(298);
+    expect(context.occurrenceCount).toBe(24);
     expect(context.scopeId).toBeTruthy();
     expect(context.scopeLabel).toBeTruthy();
     expect(context.entityIds.length).toBeGreaterThan(0);
@@ -82,25 +81,29 @@ describe('remediation queue', () => {
     const workspace = largeWorkspace();
     const office = workspace.configuration.ipv4Scopes.find(({ name }) => name === 'Office VLAN 100')!;
     const item = buildRemediationQueue(workspace).sections['act-now']
-      .find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
+      .find(({ ruleId }) => ruleId === 'scope-option-overrides-server')!;
     const context = buildRemediationContext(workspace, item, 0, office.id);
 
     expect(context.scopeId).toBe(office.id);
     expect(context.scopeLabel).toBe('Office VLAN 100');
-    expect(context.occurrenceCount).toBe(24);
+    expect(context.occurrenceCount).toBe(2);
     expect(context.relatedFindingIds.length).toBeGreaterThan(0);
   });
 
   it('summarizes exact package risk by target scope and rule', () => {
     const workspace = largeWorkspace();
-    const finding = workspace.findings.find(({ ruleId }) => ruleId === 'reservation-in-dynamic-pool')!;
-    const result = prepareFindingAction(workspace, finding, finding.actionId!, createChangeSet(workspace));
+    const target = workspace.configuration.ipv4Scopes.find(({ name }) => name === 'Office VLAN 100')!;
+    const result = addChangeOperation(workspace, createChangeSet(workspace), {
+      id: 'office-lease-review', kind: 'scope-lease.set', targetId: target.id,
+      beforeSeconds: target.leaseLifetimeSeconds!, afterSeconds: 86400,
+    });
     const risk = summarizeTargetRisk(workspace, result);
 
     expect(risk.targetScopeIds).toHaveLength(1);
     expect(risk.warningRules).toEqual(expect.arrayContaining([
-      expect.objectContaining({ ruleId: 'reservation-in-dynamic-pool', count: expect.any(Number) }),
+      expect.objectContaining({ ruleId: 'gateway-in-dynamic-pool', count: 1 }),
     ]));
+    expect(risk.warningRules).not.toContainEqual(expect.objectContaining({ ruleId: 'reservation-in-dynamic-pool' }));
     expect(risk.blockerRules.every(({ count }) => count > 0)).toBe(true);
   });
 
