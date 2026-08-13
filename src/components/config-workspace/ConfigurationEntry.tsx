@@ -1,4 +1,4 @@
-import { FileCode2, FolderOpen, ShieldCheck, Wrench } from 'lucide-react';
+import { Boxes, FileCode2, FolderOpen, ListChecks, PackageCheck, ShieldCheck, Wrench } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import exampleXml from '../../../samples/microsoft-dhcp-realistic-large.xml?raw';
 import type { Locale } from '../../content/copy';
@@ -24,6 +24,11 @@ export function ConfigurationEntry({ locale, headingRef, onOpen, notice }: Props
     file: 'DHCP-Konfigurationsdatei', choose: 'Konfiguration öffnen', example: 'Microsoft-Beispiel öffnen',
     supported: 'Microsoft DHCP XML, Kea JSON, ISC dhcpd und dnsmasq bis 2 MiB', utilities: 'Werkzeuge öffnen',
     private: 'Lokal und privat', privateText: 'Keine Uploads, keine Speicherung und keine externen Analyse-Endpunkte.',
+    outcomesKicker: 'Ergebnis statt Fragebogen', outcomesTitle: 'Das liefert DHCPulse',
+    outcomesIntro: 'Aus einem unterstützten Export entsteht ein nachvollziehbarer Arbeitsbereich für Prüfung und Umsetzung.',
+    inventoryTitle: 'Durchsuchbares Inventar', inventoryText: 'Bereiche, Pools, Ausschlüsse, Reservierungen, Optionen und Beziehungen in einer gemeinsamen Sicht.',
+    reviewTitle: 'Priorisierte Prüfung', reviewText: 'Befunde mit Evidenz, Auswirkung, Empfehlung und betroffenen Objekten statt einer unkommentierten Fehlerliste.',
+    packageTitle: 'Abgesichertes Änderungspaket', packageText: 'Validierte Microsoft-Änderungen mit Preflight-, Apply-, Verify- und Rollback-Skripten.',
     invalid: 'Die Konfiguration konnte nicht gelesen werden.', large: 'Die Datei überschreitet 2 MiB.',
   } : {
     eyebrow: 'Local DHCP workspace', title: 'Understand and improve your DHCP configuration',
@@ -31,6 +36,11 @@ export function ConfigurationEntry({ locale, headingRef, onOpen, notice }: Props
     file: 'DHCP configuration file', choose: 'Open configuration', example: 'Open Microsoft example',
     supported: 'Microsoft DHCP XML, Kea JSON, ISC dhcpd, and dnsmasq up to 2 MiB', utilities: 'Open utilities',
     private: 'Local and private', privateText: 'No uploads, no storage, and no external analysis endpoints.',
+    outcomesKicker: 'Outcomes, not questionnaires', outcomesTitle: 'What DHCPulse produces',
+    outcomesIntro: 'A supported export becomes an explainable workspace for review and implementation.',
+    inventoryTitle: 'Searchable inventory', inventoryText: 'Scopes, pools, exclusions, reservations, options, and relationships in one normalized view.',
+    reviewTitle: 'Prioritized review', reviewText: 'Findings with evidence, impact, recommendations, and affected objects instead of an unexplained error list.',
+    packageTitle: 'Guarded change package', packageText: 'Validated Microsoft changes with Preflight, Apply, Verify, and Rollback scripts.',
     invalid: 'The configuration could not be read.', large: 'The file exceeds 2 MiB.',
   };
 
@@ -84,6 +94,27 @@ export function ConfigurationEntry({ locale, headingRef, onOpen, notice }: Props
         <ShieldCheck size={28} aria-hidden="true" />
         <div><strong>{c.private}</strong><p>{c.privateText}</p></div>
       </aside>
+    </section>
+    <section className="config-outcomes" aria-labelledby="config-outcomes-heading">
+      <header>
+        <p className="section-kicker">{c.outcomesKicker}</p>
+        <h2 id="config-outcomes-heading">{c.outcomesTitle}</h2>
+        <p>{c.outcomesIntro}</p>
+      </header>
+      <div className="config-outcome-grid">
+        <article>
+          <Boxes size={22} aria-hidden="true" />
+          <div><h3>{c.inventoryTitle}</h3><p>{c.inventoryText}</p></div>
+        </article>
+        <article>
+          <ListChecks size={22} aria-hidden="true" />
+          <div><h3>{c.reviewTitle}</h3><p>{c.reviewText}</p></div>
+        </article>
+        <article>
+          <PackageCheck size={22} aria-hidden="true" />
+          <div><h3>{c.packageTitle}</h3><p>{c.packageText}</p></div>
+        </article>
+      </div>
     </section>
     <ConfigurationExportGuide locale={locale} />
     <section className="config-utilities-link planner-card">
