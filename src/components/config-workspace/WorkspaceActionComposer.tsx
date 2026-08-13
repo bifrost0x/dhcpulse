@@ -96,7 +96,6 @@ export function WorkspaceActionComposer({ locale, workspace, subjectKey, actions
 
 function actionLabel(id: WorkspaceActionDescriptor['id'], locale: Locale): string {
   const labels: Record<WorkspaceActionDescriptor['id'], [string, string]> = {
-    'exclude-reserved-address': ['Reservierungsadresse ausschließen', 'Exclude reservation address'],
     'exclude-gateway-address': ['Gateway-Adresse ausschließen', 'Exclude gateway address'],
     'resolve-duplicate-reservations': ['Doppelte Reservierungen bereinigen', 'Resolve duplicate reservations'],
     'update-reservation-address': ['Reservierungsadresse korrigieren', 'Correct reservation address'],

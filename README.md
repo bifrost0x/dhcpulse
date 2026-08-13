@@ -126,7 +126,7 @@ For controlled environments, replace `latest` in `compose.yaml` with a release t
 5. Optionally define `DHCPULSE_PORT` as an environment variable.
 6. Deploy the stack and wait for the container health check.
 
-The stack pulls `ghcr.io/bifrost0x/dhcpulse:latest`, runs without root privileges, uses a read-only root filesystem, drops Linux capabilities, and publishes the application on the configured host port.
+The stack pulls `ghcr.io/bifrost0x/dhcpulse:latest`, runs without root privileges, uses a read-only root filesystem, drops Linux capabilities, and publishes the application on the configured host port. The `latest` tag means the newest tagged release; commits merged after that release are not published to GHCR until the next version tag completes the release workflow. Pin a version tag or immutable digest when exact reproducibility matters.
 
 ### npm
 
