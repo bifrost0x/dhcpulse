@@ -1,8 +1,7 @@
 import type { ChangeSetResult } from './dhcp-change-set';
 import { listFindingActions } from './finding-actions';
 import type { ConfigurationWorkspace, WorkspaceFinding } from './config-workspace';
-import { buildMicrosoftWorkspace } from './microsoft-workspace';
-import { evaluatePackageEligibility, groupWorkspaceFindings } from './workspace-view';
+import { classifyPackageTargetFindings, evaluatePackageEligibility, groupWorkspaceFindings } from './workspace-view';
 
 export type RemediationSection = 'act-now' | 'review' | 'observe';
 
@@ -39,6 +38,7 @@ export interface TargetRiskSummary {
   targetScopeIds: string[];
   newScopes: Array<{ cidr: string; name: string }>;
   blockerRules: Array<{ ruleId: string; count: number }>;
+  existingBlockerRules: Array<{ ruleId: string; count: number }>;
   warningRules: Array<{ ruleId: string; count: number }>;
 }
 
@@ -166,18 +166,17 @@ export function summarizeTargetRisk(
   result: ChangeSetResult,
 ): TargetRiskSummary {
   const { targetScopeIds, newScopes } = evaluatePackageEligibility(workspace, result);
-  const previewWorkspace = buildMicrosoftWorkspace(result.preview);
-  const relevant = groupWorkspaceFindings(previewWorkspace)
-    .filter(({ scopeIds }) => scopeIds.some((id) => targetScopeIds.includes(id)));
-  const rules = (severity: WorkspaceFinding['severity']) => relevant
-    .filter((group) => group.severity === severity)
-    .map(({ ruleId, findings }) => ({
-      ruleId,
-      count: findings.filter((finding) => findingScopeIds(previewWorkspace, finding)
-        .some((scopeId) => targetScopeIds.includes(scopeId))).length,
-    }))
-    .filter(({ count }) => count > 0);
-  return { targetScopeIds, newScopes, blockerRules: rules('blocker'), warningRules: rules('warning') };
+  const targetFindings = classifyPackageTargetFindings(workspace, result, targetScopeIds);
+  const rules = (findings: WorkspaceFinding[]) => [...new Set(findings.map(({ ruleId }) => ruleId))]
+    .sort()
+    .map((ruleId) => ({ ruleId, count: findings.filter((finding) => finding.ruleId === ruleId).length }));
+  return {
+    targetScopeIds,
+    newScopes,
+    blockerRules: rules(targetFindings.introducedBlockers),
+    existingBlockerRules: rules(targetFindings.existingBlockers),
+    warningRules: rules(targetFindings.warnings),
+  };
 }
 
 function weakestConfidence(findings: WorkspaceFinding[]): WorkspaceFinding['confidence'] {

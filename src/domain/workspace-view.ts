@@ -137,12 +137,9 @@ export function evaluatePackageEligibility(workspace: MicrosoftWorkspace, result
     const scope = workspace.configuration.ipv4Scopes.find(({ id }) => id === scopeId);
     return !scope?.startRange || !scope.endRange;
   })) blockers.push('target-facts-missing');
-  const previewWorkspace = buildMicrosoftWorkspace(result.preview);
-  const grouped = groupWorkspaceFindings(previewWorkspace);
-  if (grouped.some(({ severity, scopeIds }) => severity === 'blocker' && scopeIds.some((scopeId) => targetScopeIds.includes(scopeId)))) blockers.push('target-blocker-findings');
-  const previewOwnership = buildOwnership(previewWorkspace);
-  const warningCount = previewWorkspace.findings.filter((finding) => finding.severity === 'warning'
-    && findingScopeIds(finding, previewOwnership).some((scopeId) => targetScopeIds.includes(scopeId))).length;
+  const targetFindings = classifyPackageTargetFindings(workspace, result, targetScopeIds);
+  if (targetFindings.introducedBlockers.length > 0) blockers.push('target-blocker-findings');
+  const warningCount = targetFindings.warnings.length;
   return {
     eligible: blockers.length === 0,
     blockers: [...new Set(blockers)],
@@ -150,6 +147,33 @@ export function evaluatePackageEligibility(workspace: MicrosoftWorkspace, result
     targetScopeIds,
     newScopes,
   };
+}
+
+export function classifyPackageTargetFindings(
+  workspace: MicrosoftWorkspace,
+  result: ChangeSetResult,
+  targetScopeIds = evaluatePackageEligibilityTargets(workspace, result),
+): {
+  introducedBlockers: WorkspaceFinding[];
+  existingBlockers: WorkspaceFinding[];
+  warnings: WorkspaceFinding[];
+} {
+  const previewWorkspace = buildMicrosoftWorkspace(result.preview);
+  const previewOwnership = buildOwnership(previewWorkspace);
+  const relevant = previewWorkspace.findings.filter((finding) => findingScopeIds(finding, previewOwnership)
+    .some((scopeId) => targetScopeIds.includes(scopeId)));
+  const importedBlockerIds = new Set(workspace.findings
+    .filter(({ severity }) => severity === 'blocker')
+    .map(({ id }) => id));
+  return {
+    introducedBlockers: relevant.filter(({ id, severity }) => severity === 'blocker' && !importedBlockerIds.has(id)),
+    existingBlockers: relevant.filter(({ id, severity }) => severity === 'blocker' && importedBlockerIds.has(id)),
+    warnings: relevant.filter(({ severity }) => severity === 'warning'),
+  };
+}
+
+function evaluatePackageEligibilityTargets(workspace: MicrosoftWorkspace, result: ChangeSetResult): string[] {
+  return [...new Set(result.changeSet.operations.flatMap((operation) => operationScopeIds(workspace, operation)))].sort();
 }
 
 function buildOwnership(workspace: MicrosoftWorkspace): Map<string, string> {
