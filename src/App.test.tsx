@@ -394,6 +394,34 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByText(/Scope 192\.0\.2\.0\/26 · Office VLAN 100/)).toBeVisible();
   });
 
+  it('distinguishes warning acknowledgement from a hard package blocker', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Scope' }), screen.getByRole('option', { name: 'Office VLAN 100' }));
+    await user.click(screen.getByRole('button', { name: 'Review Scope option overrides the server value' }));
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    await user.click(within(context).getByRole('button', { name: 'Align with server value' }));
+    await user.click(within(context).getByRole('button', { name: 'Preview change' }));
+    await user.click(within(context).getByRole('button', { name: 'Add to change plan' }));
+    await user.click(screen.getByRole('tab', { name: 'Export' }));
+
+    expect(screen.getByText('Review warnings to continue')).toBeVisible();
+    expect(screen.queryByText('Generation blocked')).not.toBeInTheDocument();
+    expect(screen.getByText('1 prepared change · 1 target scope')).toBeVisible();
+    const targetRisk = screen.getByRole('heading', { name: 'Target scope risk' }).closest('section')!;
+    expect(within(targetRisk).getByText('Existing blockers (context only)')).toBeVisible();
+    expect(within(targetRisk).getByText(/Reservation is outside its scope distribution range/)).toBeVisible();
+    const acknowledgement = screen.getByRole('checkbox', { name: /reviewed the target warnings/ });
+    expect(acknowledgement).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Generate guarded package' })).toBeDisabled();
+
+    await user.click(acknowledgement);
+    expect(screen.getByText('Ready to generate')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Generate guarded package' })).toBeEnabled();
+  });
+
   it('keeps specialist utilities reachable on a subordinate route', async () => {
     const user = userEvent.setup();
     renderAt();

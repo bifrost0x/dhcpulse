@@ -120,7 +120,9 @@ describe('remediation queue', () => {
       beforeSeconds: target.leaseLifetimeSeconds!, afterSeconds: 86400,
     });
 
-    expect(summarizeTargetRisk(workspace, result).blockerRules).toContainEqual({
+    const risk = summarizeTargetRisk(workspace, result);
+    expect(risk.blockerRules).toEqual([]);
+    expect(risk.existingBlockerRules).toContainEqual({
       ruleId: 'duplicate-reservation-identifier', count: 1,
     });
   });
