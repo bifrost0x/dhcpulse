@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import microsoftXml from '../test/fixtures/microsoft-dhcp.xml?raw';
 import { importDhcpConfiguration } from './config-import';
 import { addChangeOperation, createChangeSet, validateChangeSet, type DhcpChangeOperation } from './dhcp-change-set';
@@ -15,6 +15,10 @@ function artifactContent(artifacts: Awaited<ReturnType<typeof generatePowerShell
 }
 
 describe('PowerShell change package', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('quotes hostile values as inert PowerShell single-quoted literals', () => {
     expect(quotePowerShellLiteral("O'Brien; $(Get-ChildItem) | Remove-Item `x`")).toBe("'O''Brien; $(Get-ChildItem) | Remove-Item `x`'");
     expect(quotePowerShellLiteral('line one\nline two')).toBe("'line one\nline two'");
@@ -194,6 +198,32 @@ describe('PowerShell change package', () => {
       expect(item.sha256).toMatch(/^[0-9A-F]{64}$/);
       expect(item.sha256).toBe(await sha256(content));
     }
+  });
+
+  it('generates the manifest when native WebCrypto is unavailable on a plain HTTP LAN origin', async () => {
+    const { configuration, workspace } = setup();
+    const scope = configuration.ipv4Scopes[0]!;
+    const result = addChangeOperation(workspace, createChangeSet(workspace), {
+      id: 'lease-lan-http',
+      kind: 'scope-lease.set',
+      targetId: scope.id,
+      beforeSeconds: 28_800,
+      afterSeconds: 86_400,
+    });
+    const generatedAt = new Date('2026-08-13T10:00:00.000Z');
+    const nativePackage = await generatePowerShellPackage(workspace, result, 'en', generatedAt);
+    const nativeManifest = artifactContent(nativePackage.artifacts, 'manifest.json');
+    vi.stubGlobal('crypto', undefined);
+
+    const pkg = await generatePowerShellPackage(workspace, result, 'en', generatedAt);
+    const manifest = JSON.parse(artifactContent(pkg.artifacts, 'manifest.json')) as {
+      files: Array<{ sha256: string }>;
+    };
+
+    expect(pkg.artifacts).toHaveLength(7);
+    expect(artifactContent(pkg.artifacts, 'manifest.json')).toBe(nativeManifest);
+    expect(manifest.files).toHaveLength(6);
+    expect(manifest.files.every(({ sha256: digest }) => /^[0-9A-F]{64}$/.test(digest))).toBe(true);
   });
 
   it('refuses empty, invalid, or line-broken server targets before producing artifacts', async () => {
