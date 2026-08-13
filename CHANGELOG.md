@@ -11,6 +11,7 @@ All notable changes to DHCPulse are documented in this file. The format follows 
 - Removed an incorrect Microsoft DHCP warning that treated reservations inside the scope distribution range as unsafe.
 - Removed the corresponding exclusion proposal so generated change plans follow Microsoft DHCP reservation semantics.
 - Centralized workspace rule copy and authoritative references in a tested domain catalog.
+- Restored guarded package generation on plain HTTP LAN deployments by adding a local SHA-256 fallback for browsers that withhold WebCrypto outside secure contexts.
 
 ### Changed
 

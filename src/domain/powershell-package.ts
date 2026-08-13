@@ -1,3 +1,4 @@
+import { sha256 as sha256Fallback } from '@noble/hashes/sha2.js';
 import type { Locale } from '../content/copy';
 import type {
   ChangeSetResult,
@@ -387,8 +388,12 @@ function sortJson(value: unknown): unknown {
 }
 
 async function sha256(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const bytes = new TextEncoder().encode(value);
+  const subtle = globalThis.crypto?.subtle;
+  const digest = subtle
+    ? new Uint8Array(await subtle.digest('SHA-256', bytes))
+    : sha256Fallback(bytes);
+  return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
 function escapeMarkdown(value: string): string {
