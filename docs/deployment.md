@@ -70,7 +70,7 @@ Do not add analytics, telemetry, tag managers, remote scripts, service workers, 
 - Confirm with browser developer tools that loading and using DHCPulse requests only same-origin static assets until an external documentation link is activated.
 - Keep generated change packages outside the web root.
 
-GitHub Pages deployment is intentionally manual through the repository workflow so a domain and hosting privacy decision can be made before first publication.
+GitHub Pages publishes the latest `main` state automatically after every push. The deployment workflow can also be started manually as an operational fallback. The canonical public application is available at <https://bifrost0x.github.io/dhcpulse/>.
 
 ## Update procedure
 

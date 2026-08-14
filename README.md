@@ -13,10 +13,15 @@
 </p>
 
 <p align="center">
+  <strong><a href="https://bifrost0x.github.io/dhcpulse/">Use DHCPulse directly in your browser</a></strong> - no installation required.
+</p>
+
+<p align="center">
   <a href="https://github.com/bifrost0x/dhcpulse/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/bifrost0x/dhcpulse/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/bifrost0x/dhcpulse/actions/workflows/container-security.yml"><img alt="Container security" src="https://github.com/bifrost0x/dhcpulse/actions/workflows/container-security.yml/badge.svg"></a>
   <a href="https://github.com/bifrost0x/dhcpulse/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/bifrost0x/dhcpulse/actions/workflows/codeql.yml/badge.svg"></a>
   <a href="https://github.com/bifrost0x/dhcpulse/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/bifrost0x/dhcpulse?label=release"></a>
+  <a href="https://bifrost0x.github.io/dhcpulse/"><img alt="Live demo" src="https://img.shields.io/badge/live_demo-open-0f766e.svg"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2563eb.svg"></a>
 </p>
 
@@ -34,6 +39,10 @@ DHCP exports are useful backups, but they are difficult to review as an estate. 
 DHCPulse does not connect to a DHCP server, execute scripts, scan a network, provide DHCP service, or replace IPAM/DDI. Kea, ISC dhcpd, and dnsmasq imports are analysis-only. Guarded change packages are currently available for supported Microsoft DHCP XML imports.
 
 ## Try the complete workflow with synthetic data
+
+Open the [public DHCPulse application](https://bifrost0x.github.io/dhcpulse/) to use the complete tool without installing anything. Load the bundled synthetic example or select your own supported export. Processing stays inside your browser; the file is not uploaded to DHCPulse.
+
+To run the official container locally instead:
 
 ```bash
 docker compose pull
