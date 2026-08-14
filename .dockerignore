@@ -7,6 +7,14 @@ release
 docs
 .worktrees
 worktrees
+.agents
+.codex
+.superpowers
+.uv-cache
+graphify-out
+AGENTS.md
+CLAUDE.md
+GEMINI.md
 .vscode
 .idea
 .env
