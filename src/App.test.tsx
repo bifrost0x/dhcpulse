@@ -139,6 +139,25 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getByRole('heading', { name: 'Act now' })).toBeVisible();
   });
 
+  it('keeps every workspace destination available through compact responsive tab labels', async () => {
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+
+    const expectedTabs = [
+      ['Overview', 'Overview'],
+      ['Review issues (33)', 'Issues'],
+      ['Inventory (410)', 'Objects'],
+      ['Change plan (0)', 'Plan'],
+      ['Export', 'Export'],
+    ] as const;
+
+    for (const [accessibleName, compactLabel] of expectedTabs) {
+      const tab = screen.getByRole('tab', { name: accessibleName });
+      expect(within(tab).getByText(compactLabel, { selector: '.workspace-tab-compact' })).toBeInTheDocument();
+    }
+  });
+
   it('explains why export is unavailable and returns to the issue workflow', async () => {
     const user = userEvent.setup();
     renderAt();
@@ -190,7 +209,10 @@ describe('DHCPulse Workbench', () => {
     const preview = within(context).getByRole('heading', { name: 'Validated change preview' }).closest('section')!;
     expect(within(preview).getAllByRole('definition')[0]).toHaveTextContent('device-025.lab.example · 198.51.100.250');
     await user.click(within(context).getByRole('button', { name: 'Add to change plan' }));
-    expect(screen.getByRole('region', { name: 'Review tray' })).toHaveTextContent('1 prepared change');
+    const reviewTray = screen.getByRole('region', { name: 'Review tray' });
+    const remediationQueue = screen.getByRole('region', { name: 'Remediation queue' });
+    expect(reviewTray).toHaveTextContent('1 prepared change');
+    expect(reviewTray.compareDocumentPosition(remediationQueue) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('associates guided change validation errors with the responsible field', async () => {
@@ -560,9 +582,36 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getAllByText(/Occurrence 1 of/).length).toBeLessThanOrEqual(1);
   });
 
-  it('explains a direct workspace link when its local session is unavailable', () => {
+  it('normalizes a stale workspace URL back to the clean import entry', () => {
     renderAt('#/workspace');
-    expect(screen.getByRole('status')).toHaveTextContent('This workspace session is no longer available');
+    expect(window.location.hash).toBe('#/');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Understand and improve your DHCP configuration' })).not.toHaveFocus();
+  });
+
+  it('uses the inventory-style list and detail panes for issues on narrow layouts', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 1050px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+
+    const queue = screen.getByRole('region', { name: 'Remediation queue' });
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    expect(queue.tagName).toBe('SECTION');
+    expect(queue).toHaveClass('planner-card');
+    expect(document.querySelectorAll('main')).toHaveLength(1);
+    expect(queue).not.toContainElement(context);
+    expect(queue.parentElement?.lastElementChild).toBe(context);
   });
 
   it('keeps large object inventories search-first and bounded', async () => {

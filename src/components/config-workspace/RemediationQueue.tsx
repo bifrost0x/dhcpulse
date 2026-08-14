@@ -52,7 +52,6 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
   const [actionability, setActionability] = useState<'all' | 'actionable' | 'analysis'>('all');
   const [pages, setPages] = useState<Record<RemediationSection, number>>({ 'act-now': 1, review: 1, observe: 1 });
   const [preview, setPreview] = useState<ChangeSetResult | null>(null);
-  const narrowLayout = useNarrowLayout();
   const contextHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusContext = useRef(false);
   const preparedIds = new Set(result?.changeSet.operations.map(({ rationaleFindingId }) => rationaleFindingId) ?? []);
@@ -159,8 +158,12 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
       <label><span>{locale === 'de' ? 'Bearbeitung' : 'Actionability'}</span><select value={actionability} onChange={(event) => { setActionability(event.target.value as typeof actionability); setOccurrenceIndex(0); setPreview(null); resetPaging(); }}><option value="all">{locale === 'de' ? 'Alle' : 'All'}</option><option value="actionable">{locale === 'de' ? 'Änderung möglich' : 'Change available'}</option><option value="analysis">{locale === 'de' ? 'Prüfung nötig' : 'Review required'}</option></select></label>
     </section>
 
+    {Boolean(result?.changeSet.operations.length) && <section className="remediation-review-tray" aria-live="polite" aria-label={locale === 'de' ? 'Review-Ablage' : 'Review tray'}>
+      <ClipboardCheck size={19} aria-hidden="true" /><div><strong>{result?.changeSet.operations.length ?? 0} {locale === 'de' ? 'vorbereitete Änderungen' : `${result?.changeSet.operations.length === 1 ? 'prepared change' : 'prepared changes'}`}</strong><span>{locale === 'de' ? 'Nur lokal im aktuellen Browser-Tab' : 'Local to this browser tab only'}</span></div><button type="button" className="secondary-button" disabled={!result?.changeSet.operations.length} onClick={onReviewChanges}>{locale === 'de' ? 'Änderungen prüfen' : 'Review changes'}</button>
+    </section>}
+
     <div className="remediation-layout">
-      <main className="remediation-queue" aria-label={locale === 'de' ? 'Remediation Queue' : 'Remediation queue'}>
+      <section className="planner-card remediation-queue" aria-label={locale === 'de' ? 'Remediation Queue' : 'Remediation queue'}>
         {sectionOrder.map((section) => {
           const { items, page, pageCount, pageItems } = pageData[section];
           return <section key={section} className={`remediation-section remediation-${section}`}>
@@ -173,18 +176,14 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
                 <b>{countRemediationOccurrences(workspace, item, activeScope)}</b>
                 <span className="remediation-status">{countPreparedRemediationOccurrences(workspace, item, result, activeScope) > 0 ? `${countPreparedRemediationOccurrences(workspace, item, result, activeScope)} ${locale === 'de' ? 'vorbereitet' : 'prepared'}` : item.actionable ? (locale === 'de' ? 'Änderung möglich' : 'Change available') : (locale === 'de' ? 'Prüfen' : 'Review')}</span>
               </button>
-              {narrowLayout && selected?.id === item.id && renderContextPanel()}
             </li>)}</ol>{pageCount > 1 && <nav className="remediation-pagination" aria-label={`${sectionLabel(section, locale)} ${locale === 'de' ? 'Seiten' : 'pages'}`}><button type="button" disabled={page === 1} onClick={() => changePage(section, page - 1)}>{locale === 'de' ? 'Zurück' : 'Previous'}</button><span>{locale === 'de' ? 'Seite' : 'Page'} {page} {locale === 'de' ? 'von' : 'of'} {pageCount}</span><button type="button" disabled={page === pageCount} onClick={() => changePage(section, page + 1)}>{locale === 'de' ? 'Weiter' : 'Next'}</button></nav>}</>}
           </section>;
         })}
-      </main>
+      </section>
 
-      {!narrowLayout && renderContextPanel()}
+      {renderContextPanel()}
     </div>
 
-    {Boolean(result?.changeSet.operations.length) && <section className="remediation-review-tray" aria-live="polite" aria-label={locale === 'de' ? 'Review-Ablage' : 'Review tray'}>
-      <ClipboardCheck size={19} aria-hidden="true" /><div><strong>{result?.changeSet.operations.length ?? 0} {locale === 'de' ? 'vorbereitete Änderungen' : `${result?.changeSet.operations.length === 1 ? 'prepared change' : 'prepared changes'}`}</strong><span>{locale === 'de' ? 'Nur lokal im aktuellen Browser-Tab' : 'Local to this browser tab only'}</span></div><button type="button" className="secondary-button" disabled={!result?.changeSet.operations.length} onClick={onReviewChanges}>{locale === 'de' ? 'Änderungen prüfen' : 'Review changes'}</button>
-    </section>}
   </div>;
 });
 
@@ -257,17 +256,4 @@ function scopeSummary(item: RemediationQueueItem, workspace: ConfigurationWorksp
   const first = workspace.configuration.ipv4Scopes.find(({ id }) => id === firstId);
   const label = first?.name ?? first?.cidr ?? item.scopeIds[0];
   return activeScope ? label : item.scopeIds.length > 1 ? `${label} +${item.scopeIds.length - 1}` : label;
-}
-
-function useNarrowLayout() {
-  const query = '(max-width: 1050px)';
-  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(query).matches : false);
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined;
-    const media = window.matchMedia(query);
-    const update = () => setMatches(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-  return matches;
 }

@@ -22,6 +22,7 @@
   <a href="https://github.com/bifrost0x/dhcpulse/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/bifrost0x/dhcpulse/actions/workflows/codeql.yml/badge.svg"></a>
   <a href="https://github.com/bifrost0x/dhcpulse/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/bifrost0x/dhcpulse?label=release"></a>
   <a href="https://bifrost0x.github.io/dhcpulse/"><img alt="Live demo" src="https://img.shields.io/badge/live_demo-open-0f766e.svg"></a>
+  <a href="https://github.com/sponsors/bifrost0x"><img alt="Sponsor bifrost0x" src="https://img.shields.io/badge/Sponsor-bifrost0x-EA4AAA?logo=githubsponsors&amp;logoColor=white"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2563eb.svg"></a>
 </p>
 
@@ -214,6 +215,12 @@ Tagged releases include static archives, SHA-256 checksums, a CycloneDX SBOM, Gi
 ## Contributing
 
 Focused, evidence-backed contributions are welcome. Use synthetic data, preserve the browser-only privacy boundary, and add behavioral tests for domain changes. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening a contribution.
+
+## Support DHCPulse
+
+If DHCPulse makes a review or change-planning task easier, you can support its continued maintenance through [GitHub Sponsors](https://github.com/sponsors/bifrost0x).
+
+<a href="https://github.com/sponsors/bifrost0x"><img alt="Sponsor bifrost0x" src="https://img.shields.io/badge/Sponsor-bifrost0x-EA4AAA?logo=githubsponsors&amp;logoColor=white"></a>
 
 ## License
 
