@@ -57,7 +57,9 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
   const routeHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousRouteKindRef = useRef<Route['kind'] | null>(null);
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
-  const routeKey = route.kind === 'tool' ? `tool:${route.id}` : route.kind;
+  const missingWorkspaceSession = route.kind === 'workspace' && !workspaceSession;
+  const renderedRoute: Route = missingWorkspaceSession ? { kind: 'entry' } : route;
+  const routeKey = renderedRoute.kind === 'tool' ? `tool:${renderedRoute.id}` : renderedRoute.kind;
 
   useEffect(() => {
     const updateRoute = () => setRoute(routeFromHash(window.location.hash));
@@ -66,13 +68,18 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
   }, []);
 
   useEffect(() => {
+    if (!missingWorkspaceSession) return;
+    window.history.replaceState(null, '', '#/');
+  }, [missingWorkspaceSession]);
+
+  useEffect(() => {
     const previousRouteKind = previousRouteKindRef.current;
-    const returningToEntry = route.kind === 'entry'
+    const returningToEntry = renderedRoute.kind === 'entry'
       && previousRouteKind !== null
       && previousRouteKind !== 'entry';
-    if (route.kind !== 'entry' || returningToEntry) routeHeadingRef.current?.focus();
-    previousRouteKindRef.current = route.kind;
-  }, [route.kind, routeKey]);
+    if (renderedRoute.kind !== 'entry' || returningToEntry) routeHeadingRef.current?.focus();
+    previousRouteKindRef.current = renderedRoute.kind;
+  }, [renderedRoute.kind, routeKey]);
 
   function showCatalog() {
     setRoute({ kind: 'utilities' });
@@ -83,23 +90,23 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
   }
 
   let mainContent;
-  if (route.kind === 'entry' || (route.kind === 'workspace' && !workspaceSession)) {
+  if (renderedRoute.kind === 'entry') {
     mainContent = (
-      <ConfigurationEntry locale={locale} headingRef={routeHeadingRef} notice={route.kind === 'workspace' ? (locale === 'de' ? 'Diese Arbeitsbereich-Sitzung ist nicht mehr verfügbar. Öffne die Konfiguration erneut.' : 'This workspace session is no longer available. Open the configuration again.') : undefined} onOpen={(workspace, fileName) => {
+      <ConfigurationEntry locale={locale} headingRef={routeHeadingRef} onOpen={(workspace, fileName) => {
         setWorkspaceSession({ workspace, fileName });
         window.location.hash = '#/workspace';
         setRoute({ kind: 'workspace' });
       }} />
     );
-  } else if (route.kind === 'workspace') {
+  } else if (renderedRoute.kind === 'workspace') {
     mainContent = <ConfigurationWorkspaceView locale={locale} workspace={workspaceSession!.workspace} fileName={workspaceSession!.fileName} headingRef={routeHeadingRef} onClose={() => {
       setWorkspaceSession(null);
       window.location.hash = '#/';
       setRoute({ kind: 'entry' });
     }} />;
-  } else if (route.kind === 'utilities') {
+  } else if (renderedRoute.kind === 'utilities') {
     mainContent = <UtilitiesCatalog locale={locale} headingRef={routeHeadingRef} onToolSelect={(id) => setRoute({ kind: 'tool', id })} />;
-  } else if (route.kind === 'not-found') {
+  } else if (renderedRoute.kind === 'not-found') {
     mainContent = (
       <section className="not-found planner-card">
         <p className="section-kicker">404</p>
@@ -109,7 +116,7 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
       </section>
     );
   } else {
-    const tool = toolCatalog.find(({ id }) => id === route.id)!;
+    const tool = toolCatalog.find(({ id }) => id === renderedRoute.id)!;
     if (tool.id === 'lease') {
       mainContent = (
         <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setToolResetVersion((current) => current + 1)}>
@@ -117,7 +124,7 @@ export function WorkbenchShell({ locale, onLocaleChange }: WorkbenchShellProps) 
         </ToolFrame>
       );
     } else {
-      const Panel = toolComponents[route.id as Exclude<UtilityToolId, 'lease'>];
+      const Panel = toolComponents[renderedRoute.id as Exclude<UtilityToolId, 'lease'>];
       mainContent = (
         <ToolFrame locale={locale} tool={tool} headingRef={routeHeadingRef} onBack={showCatalog} onReset={() => setToolResetVersion((current) => current + 1)}>
           <Panel key={`${tool.id}-${toolResetVersion}`} locale={locale} tool={tool} />

@@ -210,7 +210,7 @@ describe('DHCPulse Workbench', () => {
     expect(within(preview).getAllByRole('definition')[0]).toHaveTextContent('device-025.lab.example · 198.51.100.250');
     await user.click(within(context).getByRole('button', { name: 'Add to change plan' }));
     const reviewTray = screen.getByRole('region', { name: 'Review tray' });
-    const remediationQueue = screen.getByRole('main', { name: 'Remediation queue' });
+    const remediationQueue = screen.getByRole('region', { name: 'Remediation queue' });
     expect(reviewTray).toHaveTextContent('1 prepared change');
     expect(reviewTray.compareDocumentPosition(remediationQueue) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -582,9 +582,36 @@ describe('DHCPulse Workbench', () => {
     expect(screen.getAllByText(/Occurrence 1 of/).length).toBeLessThanOrEqual(1);
   });
 
-  it('explains a direct workspace link when its local session is unavailable', () => {
+  it('normalizes a stale workspace URL back to the clean import entry', () => {
     renderAt('#/workspace');
-    expect(screen.getByRole('status')).toHaveTextContent('This workspace session is no longer available');
+    expect(window.location.hash).toBe('#/');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Understand and improve your DHCP configuration' })).not.toHaveFocus();
+  });
+
+  it('uses the inventory-style list and detail panes for issues on narrow layouts', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 1050px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(screen.getByRole('button', { name: 'Open Microsoft example' }));
+    await user.click(screen.getByRole('tab', { name: /Review issues/ }));
+
+    const queue = screen.getByRole('region', { name: 'Remediation queue' });
+    const context = screen.getByRole('complementary', { name: 'Finding context' });
+    expect(queue.tagName).toBe('SECTION');
+    expect(queue).toHaveClass('planner-card');
+    expect(document.querySelectorAll('main')).toHaveLength(1);
+    expect(queue).not.toContainElement(context);
+    expect(queue.parentElement?.lastElementChild).toBe(context);
   });
 
   it('keeps large object inventories search-first and bounded', async () => {

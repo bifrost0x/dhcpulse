@@ -34,9 +34,17 @@ describe('business workspace layout', () => {
   it('separates issue controls from a readable queue without nested context scrolling', async () => {
     const css = await readCss();
     expect(css).toMatch(/\.remediation-command-bar\s*>\s*div\s*\{[^}]*grid-column\s*:\s*1\s*\/\s*-1/i);
-    expect(css).toMatch(/\.remediation-layout\s*\{[^}]*grid-template-columns\s*:\s*minmax\(620px\s*,\s*1\.08fr\)\s+minmax\(500px\s*,\s*\.92fr\)/i);
+    expect(css).toMatch(/\.remediation-layout\s*\{[^}]*grid-template-columns\s*:\s*minmax\(340px\s*,\s*\.72fr\)\s+minmax\(0\s*,\s*1\.28fr\)/i);
+    expect(css).toMatch(/\.remediation-queue\s*\{[^}]*gap\s*:\s*0[^}]*overflow\s*:\s*hidden[^}]*padding\s*:\s*0/i);
+    expect(css).toMatch(/\.remediation-section\s*\{[^}]*border\s*:\s*0[^}]*border-radius\s*:\s*0[^}]*background\s*:\s*transparent/i);
     expect(css).toMatch(/\.remediation-context\s*\{[^}]*max-height\s*:\s*none[^}]*overflow\s*:\s*visible/i);
     expect(css).toMatch(/@media\s*\(max-width\s*:\s*700px\)\s*\{[\s\S]*?\.remediation-review-tray\s*\{[^}]*position\s*:\s*static/i);
+  });
+
+  it('stacks a bounded issue list above its separate detail pane on narrow screens', async () => {
+    const css = await readCss();
+    expect(css).toMatch(/@media\s*\(max-width\s*:\s*980px\)\s*\{[\s\S]*?\.remediation-layout\s*\{[^}]*grid-template-columns\s*:\s*1fr/i);
+    expect(css).toMatch(/@media\s*\(max-width\s*:\s*980px\)\s*\{[\s\S]*?\.remediation-queue\s*\{[^}]*max-height\s*:\s*620px[^}]*overflow\s*:\s*auto/i);
   });
 
   it('uses a filter rail above a two-pane inventory and stacks it below tablet width', async () => {

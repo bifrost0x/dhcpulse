@@ -12,10 +12,9 @@ interface Props {
   locale: Locale;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   onOpen: (workspace: ConfigurationWorkspace, fileName: string) => void;
-  notice?: string;
 }
 
-export function ConfigurationEntry({ locale, headingRef, onOpen, notice }: Props) {
+export function ConfigurationEntry({ locale, headingRef, onOpen }: Props) {
   const [error, setError] = useState('');
   const readGeneration = useRef(0);
   const c = locale === 'de' ? {
@@ -79,7 +78,6 @@ export function ConfigurationEntry({ locale, headingRef, onOpen, notice }: Props
         <p className="eyebrow"><span className="pulse-dot" />{c.eyebrow}</p>
         <h1 ref={headingRef} tabIndex={-1}>{c.title}</h1>
         <p>{c.intro}</p>
-        {notice && <p className="config-session-notice" role="status">{notice}</p>}
         <div className="config-entry-actions">
           <label className="primary-button config-file-button">
             <FolderOpen size={18} aria-hidden="true" />{c.choose}
