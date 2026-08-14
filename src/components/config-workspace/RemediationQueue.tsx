@@ -159,6 +159,10 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
       <label><span>{locale === 'de' ? 'Bearbeitung' : 'Actionability'}</span><select value={actionability} onChange={(event) => { setActionability(event.target.value as typeof actionability); setOccurrenceIndex(0); setPreview(null); resetPaging(); }}><option value="all">{locale === 'de' ? 'Alle' : 'All'}</option><option value="actionable">{locale === 'de' ? 'Änderung möglich' : 'Change available'}</option><option value="analysis">{locale === 'de' ? 'Prüfung nötig' : 'Review required'}</option></select></label>
     </section>
 
+    {Boolean(result?.changeSet.operations.length) && <section className="remediation-review-tray" aria-live="polite" aria-label={locale === 'de' ? 'Review-Ablage' : 'Review tray'}>
+      <ClipboardCheck size={19} aria-hidden="true" /><div><strong>{result?.changeSet.operations.length ?? 0} {locale === 'de' ? 'vorbereitete Änderungen' : `${result?.changeSet.operations.length === 1 ? 'prepared change' : 'prepared changes'}`}</strong><span>{locale === 'de' ? 'Nur lokal im aktuellen Browser-Tab' : 'Local to this browser tab only'}</span></div><button type="button" className="secondary-button" disabled={!result?.changeSet.operations.length} onClick={onReviewChanges}>{locale === 'de' ? 'Änderungen prüfen' : 'Review changes'}</button>
+    </section>}
+
     <div className="remediation-layout">
       <main className="remediation-queue" aria-label={locale === 'de' ? 'Remediation Queue' : 'Remediation queue'}>
         {sectionOrder.map((section) => {
@@ -182,9 +186,6 @@ export const RemediationQueue = forwardRef<RemediationQueueHandle, Props>(functi
       {!narrowLayout && renderContextPanel()}
     </div>
 
-    {Boolean(result?.changeSet.operations.length) && <section className="remediation-review-tray" aria-live="polite" aria-label={locale === 'de' ? 'Review-Ablage' : 'Review tray'}>
-      <ClipboardCheck size={19} aria-hidden="true" /><div><strong>{result?.changeSet.operations.length ?? 0} {locale === 'de' ? 'vorbereitete Änderungen' : `${result?.changeSet.operations.length === 1 ? 'prepared change' : 'prepared changes'}`}</strong><span>{locale === 'de' ? 'Nur lokal im aktuellen Browser-Tab' : 'Local to this browser tab only'}</span></div><button type="button" className="secondary-button" disabled={!result?.changeSet.operations.length} onClick={onReviewChanges}>{locale === 'de' ? 'Änderungen prüfen' : 'Review changes'}</button>
-    </section>}
   </div>;
 });
 

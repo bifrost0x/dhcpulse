@@ -46,9 +46,9 @@ export function ConfigurationWorkspaceView({ locale, workspace, fileName, headin
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const pendingTabFocus = useRef<Tab | null>(null);
   const remediationRef = useRef<RemediationQueueHandle>(null);
-  const tabs: Array<{ id: Tab; label: string }> = locale === 'de'
-    ? [{ id: 'overview', label: 'Überblick' }, { id: 'remediate', label: `Probleme prüfen (${workspace.findings.length})` }, { id: 'objects', label: `Bestand (${workspace.nodes.length})` }, { id: 'changes', label: `Änderungsplan (${changeResult?.changeSet.operations.length ?? 0})` }, { id: 'package', label: 'Export' }]
-    : [{ id: 'overview', label: 'Overview' }, { id: 'remediate', label: `Review issues (${workspace.findings.length})` }, { id: 'objects', label: `Inventory (${workspace.nodes.length})` }, { id: 'changes', label: `Change plan (${changeResult?.changeSet.operations.length ?? 0})` }, { id: 'package', label: 'Export' }];
+  const tabs: Array<{ id: Tab; label: string; compactLabel: string }> = locale === 'de'
+    ? [{ id: 'overview', label: 'Überblick', compactLabel: 'Überblick' }, { id: 'remediate', label: `Probleme prüfen (${workspace.findings.length})`, compactLabel: 'Probleme' }, { id: 'objects', label: `Bestand (${workspace.nodes.length})`, compactLabel: 'Bestand' }, { id: 'changes', label: `Änderungsplan (${changeResult?.changeSet.operations.length ?? 0})`, compactLabel: 'Plan' }, { id: 'package', label: 'Export', compactLabel: 'Export' }]
+    : [{ id: 'overview', label: 'Overview', compactLabel: 'Overview' }, { id: 'remediate', label: `Review issues (${workspace.findings.length})`, compactLabel: 'Issues' }, { id: 'objects', label: `Inventory (${workspace.nodes.length})`, compactLabel: 'Objects' }, { id: 'changes', label: `Change plan (${changeResult?.changeSet.operations.length ?? 0})`, compactLabel: 'Plan' }, { id: 'package', label: 'Export', compactLabel: 'Export' }];
   const selected = useMemo(() => workspace.nodes.find(({ id }) => id === selectedId) ?? null, [selectedId, workspace.nodes]);
   const imported = locale === 'de'
     ? workspace.format === 'microsoft-xml' ? 'Microsoft-DHCP-XML lokal importiert' : `${workspace.vendor}-Konfiguration lokal importiert`
@@ -108,7 +108,7 @@ export function ConfigurationWorkspaceView({ locale, workspace, fileName, headin
       <button type="button" className="secondary-button" onClick={onClose}>{locale === 'de' ? 'Andere Konfiguration' : 'Open another configuration'}</button>
     </header>
     <div className="workspace-product-tabs" role="tablist" aria-label={locale === 'de' ? 'Arbeitsbereich' : 'Workspace'}>
-      {tabs.map((item, index) => <button key={item.id} id={`workspace-tab-${item.id}`} ref={(node) => { tabRefs.current[index] = node; }} type="button" role="tab" tabIndex={tab === item.id ? 0 : -1} aria-selected={tab === item.id} aria-controls={`workspace-panel-${item.id}`} onClick={() => selectTab(item.id)} onKeyDown={(event) => handleTabKey(event, index)}>{item.label}</button>)}
+      {tabs.map((item, index) => <button key={item.id} id={`workspace-tab-${item.id}`} ref={(node) => { tabRefs.current[index] = node; }} type="button" role="tab" tabIndex={tab === item.id ? 0 : -1} aria-label={item.label} aria-selected={tab === item.id} aria-controls={`workspace-panel-${item.id}`} onClick={() => selectTab(item.id)} onKeyDown={(event) => handleTabKey(event, index)}><span className="workspace-tab-wide" aria-hidden="true">{item.label}</span><span className="workspace-tab-compact" aria-hidden="true">{item.compactLabel}</span></button>)}
     </div>
     <div id={`workspace-panel-${tab}`} className="workspace-product-panel" role="tabpanel" aria-labelledby={`workspace-tab-${tab}`}>
       <div hidden={tab !== 'remediate'}><RemediationQueue ref={remediationRef} locale={locale} workspace={workspace} result={changeResult} titleFor={(ruleId) => findingTitle(ruleId, locale)} explanationFor={(ruleId) => findingExplanation(ruleId, locale)} evidenceLabel={(key) => evidenceLabel(key, locale)} onPrepare={prepare} onPrepareResult={acceptChangeResult} onOpenObject={openObject} onReviewChanges={() => navigateToTab('changes')} /></div>
