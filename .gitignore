@@ -19,10 +19,20 @@ secrets/
 
 # Internal planning and local tooling
 docs/development/
+docs/superpowers/
 plans/
 plan.md
 .worktrees/
 worktrees/
+.agents/
+.codex/
+.superpowers/
+.uv-cache/
+graphify-out/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.github/copilot-instructions.md
 
 # Local editor and operating-system state
 .vscode/

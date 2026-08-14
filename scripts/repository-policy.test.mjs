@@ -9,6 +9,39 @@ import {
 } from './repository-policy.mjs';
 
 describe('repository policy', () => {
+  it('excludes local development tooling from Git and Docker contexts', async () => {
+    const gitignore = await readFile('.gitignore', 'utf8');
+    const dockerignore = await readFile('.dockerignore', 'utf8');
+
+    for (const ignoredPath of [
+      '.agents/',
+      '.codex/',
+      '.superpowers/',
+      '.uv-cache/',
+      'graphify-out/',
+      'docs/superpowers/',
+      'AGENTS.md',
+      'CLAUDE.md',
+      'GEMINI.md',
+      '.github/copilot-instructions.md',
+    ]) {
+      expect(gitignore).toContain(ignoredPath);
+    }
+
+    for (const ignoredPath of [
+      '.agents',
+      '.codex',
+      '.superpowers',
+      '.uv-cache',
+      'graphify-out',
+      'AGENTS.md',
+      'CLAUDE.md',
+      'GEMINI.md',
+    ]) {
+      expect(dockerignore.split(/\r?\n/)).toContain(ignoredPath);
+    }
+  });
+
   it('validates release artifacts before publishing architecture images', async () => {
     const workflow = await readFile('.github/workflows/release.yml', 'utf8');
     const containerJob = workflow.match(/\n {2}container:\n([\s\S]*?)\n {2}publish:\n/)?.[1];
@@ -69,11 +102,31 @@ describe('repository policy', () => {
         'docs/development/implementation-plan.md',
         'plans/next-release.md',
         '.worktrees/release/index',
+        '.agents/settings.json',
+        '.codex/config.toml',
+        '.superpowers/brainstorm/.last-token',
+        '.uv-cache/archive-v0/index',
+        'docs/superpowers/spec.md',
+        'graphify-out/graph.json',
+        'AGENTS.md',
+        'CLAUDE.md',
+        'GEMINI.md',
+        '.github/copilot-instructions.md',
       ]),
     ).toEqual([
       'docs/development/implementation-plan.md',
       'plans/next-release.md',
       '.worktrees/release/index',
+      '.agents/settings.json',
+      '.codex/config.toml',
+      '.superpowers/brainstorm/.last-token',
+      '.uv-cache/archive-v0/index',
+      'docs/superpowers/spec.md',
+      'graphify-out/graph.json',
+      'AGENTS.md',
+      'CLAUDE.md',
+      'GEMINI.md',
+      '.github/copilot-instructions.md',
     ]);
   });
 

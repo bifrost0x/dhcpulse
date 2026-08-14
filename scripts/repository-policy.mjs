@@ -1,18 +1,28 @@
 import path from 'node:path';
 
 const forbiddenDirectoryPrefixes = [
+  '.agents/',
+  '.codex/',
   '.idea/',
   '.secrets/',
+  '.superpowers/',
+  '.uv-cache/',
   '.vscode/',
   '.worktrees/',
   'docs/development/',
+  'docs/superpowers/',
+  'graphify-out/',
   'plans/',
   'secrets/',
   'worktrees/',
 ];
 
 const forbiddenExactPaths = new Set([
+  '.github/copilot-instructions.md',
   '.npmrc',
+  'agents.md',
+  'claude.md',
+  'gemini.md',
   'plan.md',
 ]);
 
