@@ -38,8 +38,8 @@
     "lint": "eslint . --max-warnings 0"
   },
   "dependencies": {
-    "@noble/hashes": "2.3.0",
-    "lucide-react": "1.33.0",
+    "@noble/hashes": "2.4.0",
+    "lucide-react": "1.37.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "saxes": "6.0.0"
