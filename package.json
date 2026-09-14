@@ -39,9 +39,9 @@
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
-    "lucide-react": "1.37.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "lucide-react": "1.44.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "saxes": "6.0.0"
   },
   "devDependencies": {
@@ -49,8 +49,8 @@
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.6",
-    "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.9.1",
