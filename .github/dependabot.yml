@@ -30,6 +30,9 @@ updates:
           - patch
       development-dependencies:
         dependency-type: development
+        exclude-patterns:
+          - "vitest"
+          - "@vitest/*"
         update-types:
           - minor
           - patch
