@@ -15,6 +15,14 @@ updates:
     commit-message:
       prefix: deps
     groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
       production-dependencies:
         dependency-type: production
         update-types:

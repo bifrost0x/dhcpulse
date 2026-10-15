@@ -1,13 +1,16 @@
-FROM node:26.8.1-alpine@sha256:2d984a15c9b54fd0aeb608b8e0d0d83529eb34d2966db27a1fb4f1edc3d298a3 AS build
+FROM node:26.8.2-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.31.5-alpine3.24@sha256:2ddec616f1cb58bcac057aa388f28cb81e35137641ef4226d321714499329bd1
+FROM nginxinc/nginx-unprivileged:1.31.5-alpine3.24@sha256:19c132c9ab02d3b783f478743dafc7a7f42e27aa7d2bdcbec1bb1128ca8f2a07
 USER 0
-RUN apk add --no-cache --upgrade libexpat=2.8.4-r0
+RUN apk add --no-cache --upgrade \
+    libexpat=2.8.5-r0 \
+    pcre2=10.49-r0 \
+    tiff=4.7.2-r0
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="DHCPulse" \
