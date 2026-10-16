@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
-    "lucide-react": "1.55.0",
+    "lucide-react": "1.56.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "saxes": "6.0.0"
