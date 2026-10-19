@@ -1,74 +1,41 @@
 version: 2
 
-updates:
-  - package-ecosystem: npm
-    directory: /
+multi-ecosystem-groups:
+  all-dependencies:
     schedule:
       interval: weekly
       day: monday
       time: "06:00"
       timezone: Europe/Berlin
-    open-pull-requests-limit: 5
-    rebase-strategy: disabled
+    open-pull-requests-limit: 1
     labels:
       - dependencies
     commit-message:
       prefix: deps
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    patterns:
+      - "*"
+    multi-ecosystem-group: all-dependencies
+    rebase-strategy: disabled
     groups:
       npm-security:
         applies-to: security-updates
         patterns:
           - "*"
-      vitest:
-        patterns:
-          - "vitest"
-          - "@vitest/*"
-      production-dependencies:
-        dependency-type: production
-        update-types:
-          - minor
-          - patch
-      development-dependencies:
-        dependency-type: development
-        exclude-patterns:
-          - "vitest"
-          - "@vitest/*"
-        update-types:
-          - minor
-          - patch
 
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:15"
-      timezone: Europe/Berlin
-    open-pull-requests-limit: 3
+    patterns:
+      - "*"
+    multi-ecosystem-group: all-dependencies
     rebase-strategy: disabled
-    labels:
-      - dependencies
-    commit-message:
-      prefix: deps
-    groups:
-      github-actions:
-        patterns:
-          - "*"
 
   - package-ecosystem: docker
     directory: /
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:30"
-      timezone: Europe/Berlin
-    open-pull-requests-limit: 3
+    patterns:
+      - "*"
+    multi-ecosystem-group: all-dependencies
     rebase-strategy: disabled
-    labels:
-      - dependencies
-    commit-message:
-      prefix: deps
-    groups:
-      container-images:
-        patterns:
-          - "*"
